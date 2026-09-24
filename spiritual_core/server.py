@@ -36,6 +36,18 @@ def _weight(store: Store, r: Record) -> str:
     return f"{weight.effective(r)} 分 · {layer} · {s}（读过 {r.read_count} 次）"
 
 
+def _many(value) -> list[str] | None:
+    """'diary,letter' / 'diary letter' / a real list -> ['diary', 'letter']; empty -> None."""
+    if not value:
+        return None
+    if isinstance(value, (list, tuple)):
+        items = [str(v) for v in value]
+    else:
+        items = str(value).replace("，", ",").replace("、", ",").replace(" ", ",").split(",")
+    items = [i.strip() for i in items if i.strip()]
+    return items or None
+
+
 def _lines(records: list[Record], empty: str) -> str:
     return "\n".join(_line(r) for r in records) if records else empty
 
@@ -120,19 +132,19 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
 
     @mcp.tool()
     @guarded
-    def timeline(start: str, end: str = "", kinds: list[str] | None = None) -> str:
+    def timeline(start: str, end: str = "", kinds: str = "") -> str:
         """按发生日期列标题。start/end 用 YYYY-MM-DD，end 不填就只看 start 那一天。
-        kinds 可选过滤：diary / intimate / handoff / anchor / raw / excerpt / image /
+        kinds 可选过滤，多个用逗号隔开：diary / intimate / handoff / anchor / raw / excerpt / image /
         letter / memory / note / plan / work / daily。"""
-        records = store.timeline(start, end or None, kinds)
+        records = store.timeline(start, end or None, _many(kinds))
         return _lines(records, "这个日期范围里没有记录。")
 
     @mcp.tool()
     @guarded
-    def search(query: str, kinds: list[str] | None = None, start: str = "", end: str = "") -> str:
+    def search(query: str, kinds: str = "", start: str = "", end: str = "") -> str:
         """按内容搜，中文可用，只返回标题。空格分开的词要同时出现；用 | 连起来的是「或」，
         换了说法也能一次搜齐，比如「难过|哭|崩 那天」。可加 kinds 和日期范围收窄。"""
-        records = store.search(query, kinds, start or None, end or None)
+        records = store.search(query, _many(kinds), start or None, end or None)
         return _lines(records, f"没搜到「{query}」。")
 
     @mcp.tool()
@@ -182,9 +194,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         body: str,
         event_date: str = "",
         title: str = "",
-        tags: list[str] | None = None,
+        tags: str = "",
         pinned: bool = False,
-        link_to: list[str] | None = None,
+        link_to: str = "",
         author: str = "",
         importance: int = 0,
     ) -> str:
@@ -197,7 +209,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         想留下对话里的某几句，用 keep，不要用这里。
         event_date 填事情发生的那天（YYYY-MM-DD），不填算今天。
         title 不填时：diary 自动叫「日期 日记」，handoff 叫「日期 交接」，其他取正文第一行。
-        link_to 填其他记录的 id，把它们挂在一起（比如日记挂当天原文）。
+        link_to 填其他记录的 id，多个用逗号隔开，把它们挂在一起（比如日记挂当天原文）。
+        tags 可选，多个用逗号隔开。
         importance 1-5，写的时候我打的分，只算草稿，回看时用 rate 改。5 分每周最多两条。
         不填就按类型给默认分。
         长文（大约超过 800 字）先写第一段，再用 append 接上，别一次塞进来，会超时。"""
@@ -207,7 +220,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             return "没做成：心里话用 confide。"
         if kind == "image":
             return "没做成：照片只能从上传网页传进来。"
-        r = store.write(kind, body, event_date or None, title or None, tags, pinned, link_to,
+        r = store.write(kind, body, event_date or None, title or None, _many(tags), pinned, _many(link_to),
                         kept_by=author, importance=importance)
         return f"写好了：{_line(r)}"
 
@@ -234,7 +247,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         kept_by: str = "ai",
         event_date: str = "",
         why: str = "",
-        link_to: list[str] | None = None,
+        link_to: str = "",
         importance: int = 0,
     ) -> str:
         """原文节选：把对话里当时很想留下的那几句原样存起来。
@@ -243,7 +256,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         kept_by：ai＝我想留的，human＝她想留的（她说"存一下这句"时填 human）。
         event_date 填这几句话说出口的那天。why 可选，一句话写为什么想留。"""
         r = store.write(
-            "excerpt", words, event_date or None, None, None, False, link_to,
+            "excerpt", words, event_date or None, None, None, False, _many(link_to),
             kept_by=kept_by, why=why, importance=importance,
         )
         return f"留下了：{_line(r)}"
