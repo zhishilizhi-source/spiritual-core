@@ -53,6 +53,21 @@
            box-shadow: 0 0 0 1.5px color-mix(in oklch, white 70%, transparent), 0 4px 14px rgba(40, 30, 60, .22); }
   h1 small, h2, .day { color: var(--on-sky) !important; }
   html::before { transition: background 1.2s ease; }
+  /* a few faint, still stars, only in the night scheme */
+  :root[data-scheme="dark"]::before {
+    background:
+      radial-gradient(1.2px 1.2px at 12% 14%, rgba(255,255,255,.55), transparent 100%),
+      radial-gradient(1px 1px at 27% 32%, rgba(255,255,255,.35), transparent 100%),
+      radial-gradient(1.4px 1.4px at 41% 9%, rgba(255,255,255,.5), transparent 100%),
+      radial-gradient(1px 1px at 58% 22%, rgba(255,255,255,.3), transparent 100%),
+      radial-gradient(1.2px 1.2px at 73% 12%, rgba(255,255,255,.45), transparent 100%),
+      radial-gradient(1px 1px at 86% 30%, rgba(255,255,255,.35), transparent 100%),
+      radial-gradient(1.3px 1.3px at 93% 6%, rgba(255,255,255,.5), transparent 100%),
+      radial-gradient(1px 1px at 8% 44%, rgba(255,255,255,.25), transparent 100%),
+      radial-gradient(1px 1px at 66% 41%, rgba(255,255,255,.25), transparent 100%),
+      radial-gradient(1.1px 1.1px at 34% 52%, rgba(255,255,255,.2), transparent 100%),
+      linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+  }
   /* Two lights on a quiet base: her mood top-left, the hour bottom-right. They drift and
      breathe slowly so the page has depth and never sits still as one flat color. */
   body::before, body::after { content: ""; position: fixed; z-index: -1; pointer-events: none;
@@ -315,8 +330,8 @@
              bg: [0.97, 0.008], card: [0.992, 0.004],
              line: [0.90, 0.02], accent: [0.52, 0.11], accentInk: [1, 0], ink: [0.30, 0.04],
              muted: [0.47, 0.03], onSky: [0.40, 0.04], dot: [0.72, 0.13] },
-    dark:  { skyTop: [0.25, 0.024], skyBottom: [0.20, 0.02], glowA: [0.37, 0.075], glowB: [0.34, 0.065],
-             bg: [0.23, 0.02], card: [0.285, 0.012],
+    dark:  { skyTop: [0.30, 0.055], skyBottom: [0.22, 0.045], glowA: [0.38, 0.075], glowB: [0.35, 0.065],
+             bg: [0.25, 0.045], card: [0.30, 0.018],
              line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
              muted: [0.75, 0.025], onSky: [0.86, 0.025], dot: [0.78, 0.12] },
   };
@@ -332,9 +347,8 @@
   };
   // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
   const PHASE = { dawn: [75, 230], day: [60, 210], dusk: [40, 300], night: [285, 265] };
-  // Dark isn't black: it's her painted night, a deep forest ink with a little sunset left
-  // at the edge (the coral-over-green of her own paintings).
-  const DARK = { base: 162, baseBottom: 150, ember: { dawn: 60, day: 50, dusk: 35, night: 25 } };
+  // Dark isn't black: a blue-black night sky, a little sunset ember left at the edge.
+  const DARK = { base: 262, baseBottom: 258, ember: { dawn: 60, day: 50, dusk: 35, night: 25 } };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   const isDark = () => document.documentElement.dataset.scheme === "dark";
   function applyTheme(t) {
