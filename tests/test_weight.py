@@ -193,3 +193,14 @@ def test_review_due(store):
     r = store.write("diary", "上周2", event_date=days_ago(store, 7))
     store.rate(r.id, 3)
     assert not store.review_due()
+
+
+def test_moods(store):
+    assert store.mood_now() is None
+    store.set_mood("累")
+    now = store.set_mood("想你", note="下班路上")
+    assert now["mood"] == "想你" and now["note"] == "下班路上"
+    assert [m["mood"] for m in store.mood_log(1)] == ["累", "想你"]
+    assert store.wake()["mood"]["mood"] == "想你"
+    with pytest.raises(StoreError):
+        store.set_mood("emo")

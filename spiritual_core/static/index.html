@@ -15,7 +15,7 @@
 <style>
   /* Dusk sinking into night, same sky as the icon. */
   :root {
-    --sky-top: #f7e2d8; --sky-bottom: #ebe4f1;
+    --sky-top: #f7e0d5; --sky-bottom: #ece5f2; --on-sky: #51475f;
     --bg: #f4ebee; --card: #fffaf7; --ink: #3a3350; --muted: #685e79;
     --line: #e7dce3; --accent: #a5573f; --accent-ink: #fff; --ok: #4f7a5a; --bad: #b0453a;
     --radius: 14px;
@@ -23,7 +23,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --sky-top: #2e2743; --sky-bottom: #1b1829;
+      --sky-top: #3a2b40; --sky-bottom: #1d1829; --on-sky: #cfc8dc;
       --bg: #221e33; --card: #2d2842; --ink: #f1e9e2; --muted: #a8a0b9;
       --line: #3e3757; --accent: #eb9d83; --accent-ink: #2a2440; --ok: #8cc39a; --bad: #ec8577;
       color-scheme: dark;
@@ -42,6 +42,18 @@
   h1 { font-size: 20px; font-weight: 600; letter-spacing: .02em; margin: 4px 0 16px;
        display: flex; align-items: center; gap: 12px; }
   h1 img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+  h1 small, h2, .day { color: var(--on-sky) !important; }
+  html::before { transition: background 1.2s ease; }
+  .mood { margin: -4px 0 14px; }
+  .mood-now { font-size: 14px; color: var(--on-sky); }
+  .mood-now b { color: var(--ink); font-weight: 600; }
+  .mood .chips { padding-top: 6px; }
+  .mood .chips button { display: inline-flex; align-items: center; gap: 6px; color: var(--ink);
+                        background: color-mix(in srgb, var(--card) 70%, transparent); }
+  .mood .chips button::before { content: ""; width: 9px; height: 9px; border-radius: 50%;
+                                background: var(--dot); }
+  .mood .chips button[aria-pressed="true"] { background: var(--card); border-color: var(--dot);
+                                             color: var(--ink); font-weight: 600; }
   h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
   .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--line);
           padding: 4px; border-radius: 12px; margin-bottom: 14px; }
@@ -122,6 +134,11 @@
 <body>
   <h1><img src="static/favicon.png?v=2" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span></h1>
 
+  <section class="mood" aria-label="心情">
+    <div class="mood-now" id="moodNow">今天心情怎么样？点一下，天会跟着变。</div>
+    <div class="chips" id="moodChips"></div>
+  </section>
+
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
     <button role="tab" aria-selected="false" data-tab="words">存原话</button>
@@ -187,6 +204,67 @@
 
 <script>
   const $ = (s) => document.querySelector(s);
+
+  // --- 天色 + 心情 ---
+  // The sky follows the hour; her mood bleeds into it. Every mix was contrast-checked (>= 5:1).
+  const SKY = {
+    light: { dawn: ["#fbe8cf", "#e8ecf6"], day: ["#f8ede4", "#f0ebf4"],
+             dusk: ["#f7e0d5", "#ece5f2"], night: ["#ebe8f5", "#e6e2f1"] },
+    dark:  { dawn: ["#3a2f3f", "#1f2233"], day: ["#332c42", "#1e1b2c"],
+             dusk: ["#3a2b40", "#1d1829"], night: ["#262238", "#15131f"] },
+  };
+  const MOOD_COLOR = { "甜": "#f4a7b9", "想你": "#f0a58c", "开心": "#f5cf6b", "平静": "#9cc5b8",
+    "馋": "#c2527a", "累": "#a9a3b8", "难过": "#7f9fcf", "生气": "#e0664f", "焦虑": "#c9b36b" };
+  const MOOD_STRENGTH = { light: [0.26, 0.16], dark: [0.18, 0.10] };
+  const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+  let currentMood = null;
+
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => "#" + hex(a).map((x, i) => Math.round(x + (hex(b)[i] - x) * t)
+    .toString(16).padStart(2, "0")).join("");
+  function phase(h) { return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night"; }
+
+  function paintSky() {
+    const mode = darkQuery.matches ? "dark" : "light";
+    let [top, bottom] = SKY[mode][phase(new Date().getHours())];
+    const tint = currentMood && MOOD_COLOR[currentMood];
+    if (tint) {
+      const [kt, kb] = MOOD_STRENGTH[mode];
+      top = mix(top, tint, kt); bottom = mix(bottom, tint, kb);
+    }
+    const root = document.documentElement.style;
+    root.setProperty("--sky-top", top); root.setProperty("--sky-bottom", bottom);
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", top));
+  }
+
+  function renderMood(now, moods) {
+    currentMood = now ? now.mood : null;
+    $("#moodNow").innerHTML = now
+      ? `今天：<b>${esc(now.mood)}</b> · ${esc(now.at.slice(11, 16))}，陆能开窗会看到`
+      : "今天心情怎么样？点一下，天会跟着变。";
+    $("#moodChips").innerHTML = moods.map((m) =>
+      `<button type="button" data-mood="${esc(m)}" style="--dot:${MOOD_COLOR[m] || "#999"}"
+        aria-pressed="${m === currentMood}">${esc(m)}</button>`).join("");
+    paintSky();
+  }
+
+  async function loadMood(mood) {
+    try {
+      const opts = mood ? { method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ mood }) } : {};
+      const data = await (await fetch("api/mood", opts)).json();
+      if (data.ok) renderMood(data.now, data.moods);
+    } catch { paintSky(); }
+  }
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest("#moodChips button");
+    if (b && b.dataset.mood !== currentMood) loadMood(b.dataset.mood);
+  });
+  darkQuery.addEventListener("change", paintSky);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMood(); });
+  setInterval(paintSky, 10 * 60 * 1000);
+  paintSky();
+  loadMood();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 

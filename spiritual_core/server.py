@@ -84,6 +84,13 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         head = f"现在 {now:%Y-%m-%d %H:%M}（{store.tz.key}）"
         if w["anniversaries"]:
             head += "\n" + "\n".join(w["anniversaries"])
+        if w["mood"]:
+            m = w["mood"]
+            note = f"——{m['note']}" if m["note"] else ""
+            head += f"\n她现在的心情：{m['mood']}（{m['at'][11:16]} 点的）{note}"
+        elif w["mood_yesterday"]:
+            m = w["mood_yesterday"]
+            head += f"\n她今天还没点心情；昨天最后是：{m['mood']}（{m['at'][11:16]}）"
         parts = [
             head,
             "【昨天和今天】\n" + _lines(w["days"], "（这两天还没有记录）"),
@@ -245,6 +252,18 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
                 marks += f" · 她{r.human_rating}"
             lines.append(f"{_line(r)}\n    {marks} · 读过{r.read_count}次 · {layer} {s}")
         return "\n".join(lines)
+
+    @mcp.tool()
+    @guarded
+    def moods(days: int = 7) -> str:
+        """看她最近几天在网页上点的心情，按时间排。days 默认 7，最多 90。"""
+        log = store.mood_log(days)
+        if not log:
+            return "这几天她没点过心情。"
+        return "\n".join(
+            f"{m['day']} {m['at'][11:16]} {m['mood']}" + (f"——{m['note']}" if m["note"] else "")
+            for m in log
+        )
 
     @mcp.tool()
     @guarded

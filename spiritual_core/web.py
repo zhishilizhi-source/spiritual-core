@@ -9,7 +9,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from . import media, weight
-from .store import Store, StoreError
+from .store import MOODS, Store, StoreError
 
 _WHO = {
     "excerpt": {"ai": "我想留的", "human": "她想留的"},
@@ -136,6 +136,18 @@ def mount(mcp, store: Store, secret: str) -> None:
             return Response(status_code=404)
         store.touch(rid)
         return JSONResponse({"ok": True})
+
+    @mcp.custom_route(p + "/api/mood", methods=["GET", "POST"])
+    async def mood(request: Request):
+        if request.method == "POST":
+            try:
+                body = await request.json()
+                store.set_mood(str(body.get("mood") or ""), str(body.get("note") or ""))
+            except StoreError as e:
+                return _err(str(e))
+            except (ValueError, AttributeError):
+                return _err("请求格式不对")
+        return JSONResponse({"ok": True, "now": store.mood_now(), "moods": list(MOODS)})
 
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):

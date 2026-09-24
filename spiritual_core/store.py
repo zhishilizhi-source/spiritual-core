@@ -32,6 +32,9 @@ NEEDS_KEEPER = ("excerpt", "letter")
 
 PLAN_STATUSES = ("open", "done")
 
+# Her mood of the moment. The page tints its sky with it; wake tells the AI.
+MOODS = ("甜", "想你", "开心", "平静", "馋", "累", "难过", "生气", "焦虑")
+
 # Trigram FTS needs at least 3 characters per term; shorter terms go through LIKE.
 _TRIGRAM_MIN = 3
 
@@ -98,6 +101,15 @@ CREATE TABLE IF NOT EXISTS images (
     bytes      INTEGER NOT NULL,
     sha256     TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS moods (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    at    TEXT NOT NULL,
+    day   TEXT NOT NULL,
+    mood  TEXT NOT NULL,
+    note  TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS moods_by_day ON moods(day, at);
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
@@ -628,6 +640,36 @@ class Store:
         ).fetchone()
         return bool(has_last_week) and not reviewed_lately
 
+    # --- moods ---
+
+    def set_mood(self, mood: str, note: str = "") -> dict:
+        mood = (mood or "").strip()
+        if mood not in MOODS:
+            raise StoreError(f"心情只能是：{'、'.join(MOODS)}")
+        now = self.now()
+        with self.db:
+            self.db.execute(
+                "INSERT INTO moods(at, day, mood, note) VALUES (?,?,?,?)",
+                (now.isoformat(timespec="seconds"), now.date().isoformat(), mood,
+                 (note or "").strip()[:200]),
+            )
+        return self.mood_now()
+
+    def mood_now(self) -> dict | None:
+        """Her latest mood today, or None if she hasn't set one yet today."""
+        row = self.db.execute(
+            "SELECT at, mood, note FROM moods WHERE day=? ORDER BY at DESC, id DESC LIMIT 1",
+            (self.today().isoformat(),),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def mood_log(self, days: int = 7) -> list[dict]:
+        since = (self.today() - timedelta(days=max(1, min(days, 90)) - 1)).isoformat()
+        rows = self.db.execute(
+            "SELECT day, at, mood, note FROM moods WHERE day >= ? ORDER BY at, id", (since,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     # --- anniversaries ---
 
     def anniversaries(self) -> list[dict]:
@@ -690,6 +732,11 @@ class Store:
         shown = {r.id for group in hot.values() for r in group}
         hot["surfaced"] = self.surface(5, shown)
         hot["anniversaries"] = self.anniversary_lines()
+        hot["mood"] = self.mood_now()
+        log = self.mood_log(2)
+        hot["mood_yesterday"] = next(
+            (m for m in reversed(log) if m["day"] == yesterday.isoformat()), None
+        )
         hot["review_due"] = self.review_due()
         return hot
 
