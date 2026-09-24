@@ -19,6 +19,15 @@ _WHO = {
 PAGE_KINDS = ("note", "memory", "letter", "plan", "daily", "work", "diary", "intimate")
 
 
+STATIC_FILES = {
+    "favicon.png": "image/png",
+    "apple-touch-icon.png": "image/png",
+    "icon-192.png": "image/png",
+    "icon-512.png": "image/png",
+    "manifest.json": "application/manifest+json",
+}
+
+
 def who_label(r) -> str:
     return _WHO.get(r.kind, {}).get(r.kept_by, r.kept_by)
 
@@ -154,6 +163,15 @@ def mount(mcp, store: Store, secret: str) -> None:
             "items": [_item(r, w) for r in records],
             "start": start, "end": end, "earliest": store.earliest_date(),
         })
+
+    @mcp.custom_route(p + "/static/{name}", methods=["GET"])
+    async def static(request: Request):
+        name = request.path_params["name"]
+        if name not in STATIC_FILES:
+            return Response(status_code=404)
+        data = resources.files("spiritual_core").joinpath("static", name).read_bytes()
+        return Response(data, media_type=STATIC_FILES[name],
+                        headers={"Cache-Control": "public, max-age=604800"})
 
     @mcp.custom_route(p + "/img/{rid}", methods=["GET"])
     async def image(request: Request):
