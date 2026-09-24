@@ -10,14 +10,17 @@
 <link rel="manifest" href="static/manifest.json?v=3">
 <meta name="apple-mobile-web-app-title" content="Spiritual Core">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- let the page run under the iPhone status bar / island instead of a separate band -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#f7e2d8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#2e2743" media="(prefers-color-scheme: dark)">
 <script>
-  // Before first paint: auto follows the phone, or her explicit choice (remembered on this device).
+  // Before first paint: 极简 (plain, follows the phone's light/dark), or 浅/深 (remembered on this device).
   (() => {
-    let t = "auto";
-    try { t = localStorage.getItem("sc-theme") || "auto"; } catch {}
-    const dark = t === "dark" || (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    let t = "plain";
+    try { t = localStorage.getItem("sc-theme") || "plain"; } catch {}
+    if (t === "auto") t = "plain";
+    const dark = t === "dark" || (t === "plain" && matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.dataset.scheme = dark ? "dark" : "light";
     document.documentElement.dataset.theme = t;
   })();
@@ -277,13 +280,39 @@
   .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
   .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+  /* ---- 极简: the first version's paper and ink. No painting, no lights, no stars, no glass. */
+  :root[data-theme="plain"] {
+    --bg: #f6f3ee; --card: #fffdf9; --ink: #2b2622; --muted: #7a7068; --on-sky: #7a7068;
+    --line: #e6dfd5; --accent: #9b5d4b; --accent-ink: #fff; --ok: #4f7a5a; --bad: #b0453a;
+    --sky-top: var(--bg); --sky-bottom: var(--bg); --glass: var(--accent);
+    --surface: var(--card); --surface-rim: var(--line); --surface-shadow: none;
+    --field: var(--bg); --field-line: var(--line); --on-bg: var(--accent); --on-ink: var(--accent-ink);
+  }
+  :root[data-theme="plain"][data-scheme="dark"] {
+    --bg: #171513; --card: #211e1b; --ink: #ece6de; --muted: #a39990; --on-sky: #a39990;
+    --line: #34302b; --accent: #d08a72; --accent-ink: #1a1512; --ok: #86b592; --bad: #e0776b;
+  }
+  :root[data-theme="plain"]::before { background: var(--bg) !important; }
+  :root[data-theme="plain"] body::before, :root[data-theme="plain"] body::after,
+  :root[data-theme="plain"] #cosmos { display: none; }
+  :root[data-theme="plain"] :is(.card, .rec, .item, .tabs, .search input, .search button, .more,
+      textarea, input[type=date], .pick, .edit, .close, .go, .theme, .mood .chips button) {
+    -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  :root[data-theme="plain"] :is(.card, .rec, .item, .tabs) { background: var(--card); border-color: var(--line); }
+  :root[data-theme="plain"] .tabs { background: var(--line); border: 0; }
+  :root[data-theme="plain"] .tabs button[aria-selected="true"] { background: var(--card); box-shadow: none; }
+  :root[data-theme="plain"] :is(textarea, input[type=date], .pick) { background: var(--bg); }
+  :root[data-theme="plain"] .go { background: var(--accent); color: var(--accent-ink); border: 0; }
+  :root[data-theme="plain"] .theme { background: var(--card); border-color: var(--line); }
+  :root[data-theme="plain"] .mood .chips button { background: var(--card); }
+  :root[data-theme="plain"] h1 img { box-shadow: none; }
 </style>
 </head>
 <body>
   <canvas id="cosmos" aria-hidden="true"></canvas>
   <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span>
     <span class="theme" role="group" aria-label="深浅">
-      <button type="button" data-theme="auto">自动</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
+      <button type="button" data-theme="plain">极简</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
     </span></h1>
 
   <section class="mood" aria-label="心情">
@@ -393,8 +422,9 @@
   const DARK = { base: 262, baseBottom: 258, ember: { dawn: 60, day: 50, dusk: 35, night: 25 } };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   const isDark = () => document.documentElement.dataset.scheme === "dark";
+  const isPlain = () => document.documentElement.dataset.theme === "plain";
   function applyTheme(t) {
-    const dark = t === "dark" || (t === "auto" && darkQuery.matches);
+    const dark = t === "dark" || (t === "plain" && darkQuery.matches);
     document.documentElement.dataset.scheme = dark ? "dark" : "light";
     document.documentElement.dataset.theme = t;
     try { localStorage.setItem("sc-theme", t); } catch {}
@@ -436,8 +466,11 @@
       "--ink": ok(R.ink, hue), "--muted": ok(R.muted, hue), "--on-sky": ok(R.onSky, hue),
     };
     const root = document.documentElement.style;
-    for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", vars["--glow-a"]));
+    // 极简 keeps the first version's fixed paper colors from the stylesheet; mood only colors the dots.
+    if (isPlain()) Object.keys(vars).forEach((k) => root.removeProperty(k));
+    else for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+    const bar = isPlain() ? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() : vars["--sky-top"];
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bar));
     document.querySelectorAll("#moodChips button").forEach((b) => b.style.setProperty("--dot", moodDot(b.dataset.mood)));
   }
 
@@ -463,12 +496,12 @@
     const b = ev.target.closest("#moodChips button");
     if (b && b.dataset.mood !== currentMood) loadMood(b.dataset.mood);
   });
-  darkQuery.addEventListener("change", () => applyTheme(document.documentElement.dataset.theme || "auto"));
+  darkQuery.addEventListener("change", () => applyTheme(document.documentElement.dataset.theme || "plain"));
   document.querySelector(".theme").addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (b) applyTheme(b.dataset.theme);
   });
   document.querySelectorAll(".theme button").forEach((b) =>
-    b.setAttribute("aria-pressed", String(b.dataset.theme === (document.documentElement.dataset.theme || "auto"))));
+    b.setAttribute("aria-pressed", String(b.dataset.theme === (document.documentElement.dataset.theme || "plain"))));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMood(); });
   setInterval(paintSky, 10 * 60 * 1000);
   // --- 星空（深色）---
@@ -627,7 +660,7 @@
     const running = () => isDark() && !document.hidden && !still.matches;
 
     function sync() {
-      if (!isDark()) { if (raf) cancelAnimationFrame(raf); raf = 0; return; }
+      if (!isDark() || isPlain()) { if (raf) cancelAnimationFrame(raf); raf = 0; return; }
       if (!layer || W !== innerWidth || H !== innerHeight) build();
       if (still.matches) { frame(0); return; }
       if (!raf) { nextMeteor = performance.now() / 1000 + 8; raf = requestAnimationFrame(loop); }
