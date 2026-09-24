@@ -206,35 +206,46 @@
   const $ = (s) => document.querySelector(s);
 
   // --- 天色 + 心情 ---
-  // The sky follows the hour; her mood bleeds into it. Every mix was contrast-checked (>= 5:1).
-  const SKY = {
-    light: { dawn: ["#fbe8cf", "#e8ecf6"], day: ["#f8ede4", "#f0ebf4"],
-             dusk: ["#f7e0d5", "#ece5f2"], night: ["#ebe8f5", "#e6e2f1"] },
-    dark:  { dawn: ["#3a2f3f", "#1f2233"], day: ["#332c42", "#1e1b2c"],
-             dusk: ["#3a2b40", "#1d1829"], night: ["#262238", "#15131f"] },
+  // Every color is OKLCH with lightness/chroma fixed per role, so only the hue moves:
+  // nothing turns muddy, and buttons/labels/lines always match the sky.
+  // The top of the sky is her mood, the bottom is the hour. Contrast checked at every hue (>= 4.9:1).
+  const ROLES = {
+    light: { skyTop: [0.93, 0.045], skyBottom: [0.955, 0.03], bg: [0.965, 0.012], card: [0.99, 0.006],
+             line: [0.90, 0.02], accent: [0.52, 0.11], accentInk: [1, 0], ink: [0.30, 0.04],
+             muted: [0.47, 0.03], onSky: [0.40, 0.04], dot: [0.72, 0.13] },
+    dark:  { skyTop: [0.34, 0.05], skyBottom: [0.22, 0.035], bg: [0.24, 0.02], card: [0.29, 0.025],
+             line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
+             muted: [0.75, 0.025], onSky: [0.86, 0.025], dot: [0.78, 0.12] },
   };
-  const MOOD_COLOR = { "甜": "#f4a7b9", "想你": "#f0a58c", "开心": "#f5cf6b", "平静": "#9cc5b8",
-    "馋": "#c2527a", "累": "#a9a3b8", "难过": "#7f9fcf", "生气": "#e0664f", "焦虑": "#c9b36b" };
-  const MOOD_STRENGTH = { light: [0.26, 0.16], dark: [0.18, 0.10] };
+  // [hue, chroma scale]
+  const MOOD = { "甜": [355, 1], "想你": [40, 1], "开心": [85, 1], "平静": [165, 0.9], "馋": [345, 1.35],
+    "累": [290, 0.5], "难过": [250, 1], "生气": [20, 1.2], "焦虑": [205, 0.7] };
+  // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
+  const PHASE = { dawn: [75, 230], day: [60, 300], dusk: [40, 300], night: [285, 270] };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   let currentMood = null;
 
-  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const mix = (a, b, t) => "#" + hex(a).map((x, i) => Math.round(x + (hex(b)[i] - x) * t)
-    .toString(16).padStart(2, "0")).join("");
+  const ok = ([l, c], h, scale = 1) => `oklch(${l} ${(c * scale).toFixed(3)} ${h})`;
   function phase(h) { return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night"; }
+  const moodDot = (m) => ok(ROLES[darkQuery.matches ? "dark" : "light"].dot, MOOD[m][0], Math.min(MOOD[m][1], 1));
 
   function paintSky() {
-    const mode = darkQuery.matches ? "dark" : "light";
-    let [top, bottom] = SKY[mode][phase(new Date().getHours())];
-    const tint = currentMood && MOOD_COLOR[currentMood];
-    if (tint) {
-      const [kt, kb] = MOOD_STRENGTH[mode];
-      top = mix(top, tint, kt); bottom = mix(bottom, tint, kb);
-    }
+    const R = ROLES[darkQuery.matches ? "dark" : "light"];
+    const [phaseTop, phaseBottom] = PHASE[phase(new Date().getHours())];
+    const [hue, scale] = currentMood && MOOD[currentMood] ? MOOD[currentMood] : [phaseTop, 1];
+    // Dark yellow is brown: in the dark scheme, yellow hues stay quiet in the surfaces
+    // and let the accent and dots carry the color.
+    const quiet = darkQuery.matches && hue >= 55 && hue <= 125 ? 0.5 : 1;
+    const vars = {
+      "--sky-top": ok(R.skyTop, hue, scale * quiet), "--sky-bottom": ok(R.skyBottom, phaseBottom),
+      "--bg": ok(R.bg, hue, quiet), "--card": ok(R.card, hue, quiet), "--line": ok(R.line, hue, quiet),
+      "--accent": ok(R.accent, hue, Math.min(scale, 1)), "--accent-ink": ok(R.accentInk, hue),
+      "--ink": ok(R.ink, hue), "--muted": ok(R.muted, hue), "--on-sky": ok(R.onSky, hue),
+    };
     const root = document.documentElement.style;
-    root.setProperty("--sky-top", top); root.setProperty("--sky-bottom", bottom);
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", top));
+    for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", vars["--sky-top"]));
+    document.querySelectorAll("#moodChips button").forEach((b) => b.style.setProperty("--dot", moodDot(b.dataset.mood)));
   }
 
   function renderMood(now, moods) {
@@ -243,8 +254,7 @@
       ? `今天：<b>${esc(now.mood)}</b> · ${esc(now.at.slice(11, 16))}，陆能开窗会看到`
       : "今天心情怎么样？点一下，天会跟着变。";
     $("#moodChips").innerHTML = moods.map((m) =>
-      `<button type="button" data-mood="${esc(m)}" style="--dot:${MOOD_COLOR[m] || "#999"}"
-        aria-pressed="${m === currentMood}">${esc(m)}</button>`).join("");
+      `<button type="button" data-mood="${esc(m)}" aria-pressed="${m === currentMood}">${esc(m)}</button>`).join("");
     paintSky();
   }
 
