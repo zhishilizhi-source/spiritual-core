@@ -56,7 +56,7 @@
   /* Light scheme: white paper with a fine grain and a faint scatter of moons and stars. */
   :root { --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .30  0 0 0 0 .26  0 0 0 0 .38  0 0 0 .16 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); }
   :root[data-scheme="light"]::before {
-    background: var(--grain), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><g fill='%235a4f78' fill-opacity='.075'><path d='M52 40a11 11 0 1 0 9 17a8.5 8.5 0 1 1-9-17z'/><path d='M176 150l2.2 6.3 6.3 2.2-6.3 2.2-2.2 6.3-2.2-6.3-6.3-2.2 6.3-2.2z'/><circle cx='150' cy='38' r='1.6'/><circle cx='112' cy='176' r='1.3'/><circle cx='206' cy='96' r='1.1'/><circle cx='30' cy='150' r='1.2'/><circle cx='84' cy='104' r='.9'/></g></svg>") 0 0 / 240px 240px,
+    background: var(--grain), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><g fill='%235a4f78' fill-opacity='.17'><path d='M52 40a11 11 0 1 0 9 17a8.5 8.5 0 1 1-9-17z'/><path d='M176 150l2.2 6.3 6.3 2.2-6.3 2.2-2.2 6.3-2.2-6.3-6.3-2.2 6.3-2.2z'/><circle cx='150' cy='38' r='1.6'/><circle cx='112' cy='176' r='1.3'/><circle cx='206' cy='96' r='1.1'/><circle cx='30' cy='150' r='1.2'/><circle cx='84' cy='104' r='.9'/></g></svg>") 0 0 / 240px 240px,
                 linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
   }
   /* Dark scheme: a drawn starfield sits above the nebula lights. */
@@ -211,14 +211,19 @@
   .card, .rec, .item { border-radius: 18px; }
   /* the white is where the eye rests, so that's where the paper grain goes */
   :root[data-scheme="light"] .card, :root[data-scheme="light"] .rec, :root[data-scheme="light"] .item {
-    background: var(--grain), var(--surface); }
+    background: var(--grain), color-mix(in oklch, var(--card) 50%, transparent);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   :root[data-scheme="light"] textarea, :root[data-scheme="light"] input[type=date],
   :root[data-scheme="light"] .pick { background: var(--grain), var(--field); }
   /* at night the glass thins out so the stars come through, softly */
   :root[data-scheme="dark"] .card, :root[data-scheme="dark"] .rec, :root[data-scheme="dark"] .item,
   :root[data-scheme="dark"] .tabs {
-    background: color-mix(in oklch, var(--card) 40%, transparent);
-    -webkit-backdrop-filter: blur(5px) saturate(120%); backdrop-filter: blur(5px) saturate(120%); }
+    background: color-mix(in oklch, var(--card) 24%, transparent);
+    -webkit-backdrop-filter: blur(3px) saturate(120%); backdrop-filter: blur(3px) saturate(120%); }
+  /* a faint shadow under text so a star behind a word never washes it out */
+  :root[data-scheme="dark"] .card, :root[data-scheme="dark"] .rec, :root[data-scheme="dark"] .item,
+  :root[data-scheme="dark"] h1, :root[data-scheme="dark"] .mood, :root[data-scheme="dark"] .day,
+  :root[data-scheme="dark"] h2 { text-shadow: 0 0 6px rgba(0, 0, 0, .55), 0 0 2px rgba(0, 0, 0, .4); }
   .tabs { border-radius: 16px; padding: 5px; }
   .tabs button { border-radius: 12px; }
   .tabs button[aria-selected="true"] { background: color-mix(in oklch, var(--glass) 38%, var(--card));
@@ -336,10 +341,10 @@
              bg: [0.97, 0.008], card: [0.992, 0.004],
              line: [0.90, 0.02], accent: [0.52, 0.11], accentInk: [1, 0], ink: [0.30, 0.04],
              muted: [0.47, 0.03], onSky: [0.40, 0.04], dot: [0.72, 0.13] },
-    dark:  { skyTop: [0.30, 0.055], skyBottom: [0.22, 0.045], glowA: [0.38, 0.075], glowB: [0.35, 0.065],
-             bg: [0.25, 0.045], card: [0.30, 0.018],
+    dark:  { skyTop: [0.20, 0.045], skyBottom: [0.13, 0.035], glowA: [0.33, 0.075], glowB: [0.29, 0.06],
+             bg: [0.16, 0.035], card: [0.30, 0.018],
              line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
-             muted: [0.75, 0.025], onSky: [0.86, 0.025], dot: [0.78, 0.12] },
+             muted: [0.84, 0.02], onSky: [0.88, 0.022], dot: [0.78, 0.12] },
   };
   // h: hue, s: chroma scale. Optional per mood: top = sky-top [L, C] per scheme (a deeper,
   // stickier sky), ah/ac = accent hue and chroma. Overrides were contrast-checked on their own.
@@ -441,18 +446,67 @@
   const cosmos = (() => {
     const cv = document.getElementById("cosmos"), ctx = cv.getContext("2d");
     const still = matchMedia("(prefers-reduced-motion: reduce)");
-    const TINTS = ["255,255,255", "205,218,255", "255,234,214", "228,214,255"];
+    // mostly white; a little ice blue, pale gold, faint pink, faint cyan
+    const TINTS = [["255,255,255", 60], ["196,214,255", 15], ["255,228,188", 12], ["255,205,226", 8], ["196,240,255", 5]];
+    const tint = () => { let k = rnd() * 100; for (const [c, w] of TINTS) { if ((k -= w) < 0) return c; } return TINTS[0][0]; };
     let W = 0, H = 0, dpr = 1, seed = 1, layer = null, twinkles = [], raf = 0, last = 0, meteor = null, nextMeteor = 0;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
 
-    function dot(g, x, y, r, a, c, halo) {
+    function dot(g, x, y, r, a, c, halo, spikes) {
       if (halo) {
-        const grd = g.createRadialGradient(x, y, 0, x, y, r * 6);
-        grd.addColorStop(0, `rgba(${c},${a * 0.35})`); grd.addColorStop(1, `rgba(${c},0)`);
-        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r * 6, 0, 6.2832); g.fill();
+        const grd = g.createRadialGradient(x, y, 0, x, y, r * 7);
+        grd.addColorStop(0, `rgba(${c},${a * 0.4})`); grd.addColorStop(0.35, `rgba(${c},${a * 0.12})`);
+        grd.addColorStop(1, `rgba(${c},0)`);
+        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r * 7, 0, 6.2832); g.fill();
+      }
+      if (spikes) {                                      // a thin four-point glint
+        const L = r * spikes;
+        for (const [dx, dy] of [[1, 0], [0, 1]]) {
+          const grd = g.createLinearGradient(x - dx * L, y - dy * L, x + dx * L, y + dy * L);
+          grd.addColorStop(0, `rgba(${c},0)`); grd.addColorStop(0.5, `rgba(${c},${a * 0.8})`); grd.addColorStop(1, `rgba(${c},0)`);
+          g.strokeStyle = grd; g.lineWidth = Math.max(0.5, r * 0.35); g.beginPath();
+          g.moveTo(x - dx * L, y - dy * L); g.lineTo(x + dx * L, y + dy * L); g.stroke();
+        }
       }
       g.fillStyle = `rgba(${c},${a})`; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+      if (r > 0.7) { g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath(); g.arc(x, y, r * 0.45, 0, 6.2832); g.fill(); }
+    }
+
+    // Today's real moon phase: 0 = new, 0.25 = first quarter, 0.5 = full, 0.75 = last quarter.
+    function moonPhase(d = new Date()) {
+      const days = (d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+      return ((days / 29.530588853) % 1 + 1) % 1;
+    }
+
+    function moon(g, cx, cy, r) {
+      const p = moonPhase(), th = 2 * Math.PI * p, rx = r * Math.abs(Math.cos(th));
+      const halo = g.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 5);
+      const lit = (1 - Math.cos(th)) / 2;               // 0..1, how much of it is lit
+      halo.addColorStop(0, `rgba(255,240,215,${0.08 + 0.22 * lit})`); halo.addColorStop(1, "rgba(255,240,215,0)");
+      g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, r * 5, 0, 6.2832); g.fill();
+      g.fillStyle = "rgba(190,205,255,0.07)";           // earthshine on the dark part
+      g.beginPath(); g.arc(cx, cy, r, 0, 6.2832); g.fill();
+      g.save();
+      g.beginPath();                                    // the lit shape, northern-hemisphere view
+      if (p < 0.5) {
+        g.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, false);
+        g.ellipse(cx, cy, rx, r, 0, Math.PI / 2, -Math.PI / 2, p < 0.25);
+      } else {
+        g.arc(cx, cy, r, Math.PI / 2, 3 * Math.PI / 2, false);
+        g.ellipse(cx, cy, rx, r, 0, -Math.PI / 2, Math.PI / 2, p > 0.75);
+      }
+      g.closePath();
+      const face = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      face.addColorStop(0, "rgba(255,250,236,1)"); face.addColorStop(1, "rgba(236,226,206,1)");
+      g.fillStyle = face; g.fill();
+      g.clip();                                         // a few soft maria and craters, only on the lit part
+      for (const [dx, dy, rr, a] of [[-0.3, -0.2, 0.28, 0.10], [0.25, 0.15, 0.22, 0.08], [-0.05, 0.35, 0.16, 0.07],
+                                      [0.35, -0.3, 0.1, 0.09], [-0.4, 0.2, 0.08, 0.08]]) {
+        g.fillStyle = `rgba(150,140,130,${a})`;
+        g.beginPath(); g.arc(cx + dx * r, cy + dy * r, rr * r, 0, 6.2832); g.fill();
+      }
+      g.restore();
     }
 
     function build() {
@@ -463,25 +517,36 @@
       seed = 20260713;                                    // the day it started
       // the milky way: a soft band from bottom-left to top-right
       const along = (t) => [t * W * 1.3 - W * 0.15, H * 0.92 - t * H * 0.85];
-      for (let i = 0; i < 26; i++) {
-        const [x, y] = along(i / 25), r = Math.min(W, H) * (0.16 + rnd() * 0.1);
+      const cloud = (x, y, r, rgb, a) => {
         const grd = g.createRadialGradient(x, y, 0, x, y, r);
-        grd.addColorStop(0, `rgba(190,180,235,${0.06 + rnd() * 0.05})`); grd.addColorStop(1, "rgba(190,180,235,0)");
+        grd.addColorStop(0, `rgba(${rgb},${a})`); grd.addColorStop(1, `rgba(${rgb},0)`);
         g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+      };
+      for (let i = 0; i < 30; i++) {                     // the band's glow
+        const [x, y] = along(i / 29);
+        cloud(x, y, Math.min(W, H) * (0.14 + rnd() * 0.1), "185,178,238", 0.05 + rnd() * 0.05);
+      }
+      for (let i = 0; i < 9; i++) {                      // wisps of pink and blue beside it
+        const [bx, by] = along(0.1 + rnd() * 0.8), off = gauss() * Math.min(W, H) * 0.12;
+        cloud(bx + off * 0.7, by + off, Math.min(W, H) * (0.08 + rnd() * 0.12),
+              rnd() < 0.5 ? "240,160,205" : "140,170,255", 0.04 + rnd() * 0.05);
       }
       twinkles = [];
-      const field = Math.round(W * H / 1400), dust = Math.round(W * H / 650);
+      const field = Math.round(W * H / 1100), dust = Math.round(W * H / 420);
       for (let i = 0; i < field + dust; i++) {
         const isDust = i >= field;
         let x, y;
         if (isDust) { const [bx, by] = along(rnd()); const off = gauss() * Math.min(W, H) * 0.08; x = bx + off * 0.7; y = by + off; }
         else { x = rnd() * W; y = rnd() * H; }
-        const big = !isDust && rnd() < 0.035;
-        const s = { x, y, c: TINTS[Math.floor(rnd() * TINTS.length)],
-          r: isDust ? 0.25 + rnd() * 0.45 : big ? 1.1 + rnd() * 0.8 : 0.3 + rnd() * 0.7,
-          a: isDust ? 0.12 + rnd() * 0.3 : 0.3 + rnd() * 0.6, big, ph: rnd() * 6.2832, sp: 0.35 + rnd() * 0.9 };
-        if (!isDust && rnd() < 0.16) twinkles.push(s); else dot(g, s.x, s.y, s.r, s.a, s.c, s.big);
+        // heavy-tailed sizes: a sky of fine points, a few medium, very few bright
+        const r = isDust ? 0.2 + rnd() * 0.35 : 0.22 + 1.7 * Math.pow(rnd(), 5);
+        const s = { x, y, r, c: tint(), a: isDust ? 0.1 + rnd() * 0.3 : Math.min(1, 0.35 + r * 0.45 + rnd() * 0.25),
+          halo: r > 0.75, spikes: r > 1.15 ? 7 + rnd() * 5 : 0, ph: rnd() * 6.2832, sp: 0.3 + rnd() * 0.8 };
+        if (!isDust && (r > 0.6 ? rnd() < 0.45 : rnd() < 0.08)) twinkles.push(s);
+        else dot(g, s.x, s.y, s.r, s.a, s.c, s.halo, s.spikes);
       }
+      // tucked into the empty strip above the header, clear of every control
+      moon(g, W * 0.5, 13, 8.5);
     }
 
     function frame(t) {
@@ -490,7 +555,10 @@
       ctx.drawImage(layer, 0, 0);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const secs = t / 1000;
-      for (const s of twinkles) dot(ctx, s.x, s.y, s.r, s.a * (0.5 + 0.5 * Math.sin(secs * s.sp + s.ph)), s.c, s.big);
+      for (const s of twinkles) {
+        const k = 0.5 + 0.5 * Math.sin(secs * s.sp + s.ph);
+        dot(ctx, s.x, s.y, s.r * (0.85 + 0.25 * k), s.a * (0.35 + 0.65 * k), s.c, s.halo, s.spikes * (0.6 + 0.6 * k));
+      }
       if (!still.matches) {
         if (!meteor && secs > nextMeteor) {
           meteor = { x: W * (0.3 + Math.random() * 0.7), y: H * Math.random() * 0.35, born: secs, life: 0.9 };
