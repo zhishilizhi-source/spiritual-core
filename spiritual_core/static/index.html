@@ -339,13 +339,17 @@
   :root[data-theme="plain"] .mood .chips button { background: var(--card); }
   :root[data-theme="plain"] h1 img { box-shadow: none; }
   /* ---- First impression: everything she can do fits on the first screen of a phone. */
-  h1 { margin: 0 0 8px; }
-  h1 img { width: 34px; height: 34px; border-radius: 9px; }
-  .mood { margin: 0 0 8px; }
-  .count { margin: 0 2px 6px; align-items: baseline; }
-  #today .rec { margin-bottom: 6px; }
-  #today .rec > summary { padding: 8px 14px; }
-  #today + .tabs { margin-top: 10px; }
+  h1 { margin: 6px 0 14px; }
+  h1 img { width: 38px; height: 38px; border-radius: 10px; }
+  .mood { margin: 0 0 14px; }
+  .count { margin: 0 2px 10px; align-items: baseline; }
+  #today .rec { margin-bottom: 8px; }
+  #today .rec > summary { padding: 10px 14px; align-items: center; }
+  #today .rec > summary .kind { width: 3em; }
+  #today .rec > summary .t { font-size: 15px; }
+  #today .rec > summary .aside { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #today .rec > summary .layer { margin-left: -2px; }
+  #today + .tabs { margin-top: 16px; }
   .tabs { margin-bottom: 10px; padding: 4px; }
   .tabs button { padding: 7px 0; }
   form.card { padding: 12px 14px; }
@@ -413,7 +417,7 @@
       <input type="file" name="file" accept="image/*" multiple>
     </label>
     <label for="caption">说明</label>
-    <textarea id="caption" name="caption" placeholder="什么时候、在哪、为什么想存（几张共用这段）"></textarea>
+    <textarea id="caption" name="caption" placeholder="什么时候、在哪、为什么想存"></textarea>
     <label for="photoDate">哪天的事</label>
     <input type="date" id="photoDate" name="event_date">
     <div class="hint">不填就用拍摄日期，没有就算今天。</div>
@@ -769,6 +773,7 @@
     $("#innerShelf").hidden = b.dataset.tab !== "write";
     if (b.dataset.tab === "write") loadInner();
     $("#recentBox").hidden = b.dataset.tab === "browse";
+    $("#today").hidden = b.dataset.tab === "browse";
     if (b.dataset.tab === "browse" && !browsed) resetBrowse();
   }));
 
@@ -956,7 +961,7 @@
 
   const ITEMS = new Map();
 
-  function recHtml(it, label) {
+  function recHtml(it, label, aside) {
     ITEMS.set(it.id, it);
     if (it.sealed) {
       return `<div class="rec sealed"><div class="sealed-row"><span class="kind">心里话</span>
@@ -973,7 +978,7 @@
     const tick = it.kind === "plan"
       ? `<input type="checkbox" class="tick" data-id="${esc(it.id)}" ${it.status === "done" ? "checked" : ""} aria-label="做完了">` : "";
     return `<details class="rec"><summary><span class="kind">${label ? esc(label) : esc(KIND_NAME[it.kind] || it.kind) + who}</span>
-      ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}</summary>
+      ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}${aside ? `<span class="aside">${esc(aside)}</span>` : ""}</summary>
       <div class="full">${img}${it.kind === "image" && it.body === "（没写说明）" ? ""
         : it.kind === "raw" ? rawHtml(it.body) : `<div class="body">${esc(it.body)}</div>`}
       ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
@@ -1106,8 +1111,8 @@
   }
   function msgsHtml(list) {
     const unseen = list.filter((m) => !m.seen_at).length;
-    return `<details class="rec msgs"><summary><span class="kind">陆能留言</span>
-      <span class="t">${esc(list[0].title)}</span>${unseen ? `<span class="layer new">${unseen} 条新的</span>` : ""}</summary>
+    return `<details class="rec msgs"><summary><span class="kind">留言</span>
+      <span class="t">${esc(list[0].title)}</span>${unseen ? `<span class="layer new">${unseen} 新</span>` : ""}<span class="aside">${md(list[0].event_date)}</span></summary>
       <div class="full">${list.map(msgItemHtml).join("")}<div class="hint">你回过的，第二天收进便签。</div>
       <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`;
   }
@@ -1137,9 +1142,9 @@
     const count = v.days.length || sealed ? `<div class="count">${v.days.map((a) =>
       `<span>${esc(a.name)}${a.ahead ? "还有" : ""} <b>${a.days}</b> 天</span>`).join("")}${sealed}</div>` : "";
     const rows = [];
-    if (v.diary) rows.push(recHtml(v.diary, `日记 · ${md(v.diary.event_date)}`));
+    if (v.diary) rows.push(recHtml(v.diary, "日记", md(v.diary.event_date)));
     if (v.messages.length) rows.unshift(msgsHtml(v.messages));
-    if (v.month_ago) rows.push(recHtml(v.month_ago, `一个月前 · ${md(v.month_ago_date)}`));
+    if (v.month_ago) rows.push(recHtml(v.month_ago, "一月前", md(v.month_ago_date)));
     $("#today").innerHTML = count + rows.join("");
   }
   $("#today").addEventListener("click", shelfClick);
