@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 from importlib import resources
 
@@ -184,6 +185,27 @@ def mount(mcp, store: Store, secret: str) -> None:
             "items": [_item(r, w) for r in records],
             "start": start, "end": end, "earliest": store.earliest_date(),
         })
+
+    backgrounds = store.path.parent / "backgrounds"
+
+    def background_names() -> list[str]:
+        try:
+            return json.loads((backgrounds / "index.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+
+    @mcp.custom_route(p + "/api/backgrounds", methods=["GET"])
+    async def background_list(request: Request):
+        """Her paintings, washed out for the light scheme (made by scripts/make_backgrounds.py)."""
+        return JSONResponse({"items": background_names()})
+
+    @mcp.custom_route(p + "/bg/{name}", methods=["GET"])
+    async def background(request: Request):
+        name = request.path_params["name"]
+        if name not in background_names():
+            return Response(status_code=404)
+        return Response((backgrounds / name).read_bytes(), media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=604800"})
 
     @mcp.custom_route(p + "/static/{name}", methods=["GET"])
     async def static(request: Request):

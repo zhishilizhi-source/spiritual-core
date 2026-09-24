@@ -59,3 +59,16 @@ def test_only_inner_can_lock_and_page_cannot_write_inner(env):
         store.set_locked(store.write("note", "x").id, True)
     assert client.post("/k/api/write", json={"kind": "inner", "body": "x"}).status_code == 400
     assert store.locked_count() == 0
+
+
+def test_backgrounds_only_serve_listed_files(env, tmp_path):
+    store, client = env
+    bg = tmp_path / "backgrounds"
+    bg.mkdir()
+    (bg / "a.jpg").write_bytes(b"jpeg")
+    (bg / "b.jpg").write_bytes(b"secret")
+    (bg / "index.json").write_text('["a.jpg"]', encoding="utf-8")
+    assert client.get("/k/api/backgrounds").json()["items"] == ["a.jpg"]
+    assert client.get("/k/bg/a.jpg").content == b"jpeg"
+    assert client.get("/k/bg/b.jpg").status_code == 404
+    assert client.get("/k/bg/..%2Fcore.db").status_code == 404
