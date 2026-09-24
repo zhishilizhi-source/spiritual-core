@@ -364,6 +364,10 @@
   form.card { display: flex; flex-direction: column; min-height: var(--form-h, auto); }
   #photo .pick, #words #w, #write #wb { flex: 1 0 auto; }
   form.card textarea.words { min-height: 72px; }
+  /* iOS sizes its date picker on its own inside a flex column; pin it to a plain field */
+  form.card input[type=date] { flex: none; display: block; width: 100%; min-width: 0; height: 46px;
+    -webkit-appearance: none; appearance: none; text-align: left; line-height: 24px; }
+  form.card input[type=date]::-webkit-date-and-time-value { text-align: left; margin: 0; }
   #words #why { min-height: 0 !important; height: 52px; }
 </style>
 </head>
