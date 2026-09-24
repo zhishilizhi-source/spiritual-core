@@ -45,12 +45,30 @@ def _text(msg: dict) -> list[tuple[str, str]]:
     parts = []
     for block in msg.get("content") or []:
         if block.get("type") == "text" and (block.get("text") or "").strip():
-            parts.append(("text", block["text"]))
+            parts += _split_thinking(block["text"])
         elif block.get("type") == "thinking" and (block.get("thinking") or "").strip():
             parts.append(("thinking", block["thinking"]))
     if not parts and (msg.get("text") or "").strip():
-        parts.append(("text", msg["text"]))
-    return parts
+        parts += _split_thinking(msg["text"])
+    return [(k, t) for k, t in parts if t.strip()]
+
+
+# Some windows wrote their thinking into the reply itself (```thinking fences, <thinking> tags)
+# and stamped replies with `[date time]`. Pull thinking out into its own part, drop the stamp.
+_INLINE_THINKING = re.compile(r"```\s*thinking\s*\n(.*?)(?:\n```|\Z)|<thinking>(.*?)(?:</thinking>|\Z)", re.S)
+_STAMP = re.compile(r"^\s*`?\[20\d\d-\d\d-\d\d(?:[ T]\d\d:\d\d(?::\d\d)?)?[^\]}\n]*[\]}]`?[ \t]*\n?")
+
+
+def _split_thinking(text: str) -> list[tuple[str, str]]:
+    out, pos = [], 0
+    for m in _INLINE_THINKING.finditer(text):
+        if text[pos:m.start()].strip():
+            out.append(("text", text[pos:m.start()]))
+        out.append(("thinking", m.group(1) if m.group(1) is not None else m.group(2)))
+        pos = m.end()
+    if text[pos:].strip():
+        out.append(("text", text[pos:]))
+    return [(k, _STAMP.sub("", t, count=1) if k == "text" else t) for k, t in out]
 
 
 def render(conversations: list, human: str, ai: str, label: str = "",
@@ -107,10 +125,18 @@ TURN_GAP = timedelta(minutes=10)
 _BLANKS = re.compile(r"\n[ \t]*\n(?:[ \t]*\n)+")
 
 
+_FENCE = re.compile(r"^[ \t]*```[\w-]*[ \t]*$", re.M)
+_BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
+_HEADING = re.compile(r"^#{1,4}[ \t]+", re.M)
+
+
 def _tidy(text: str) -> str:
-    """Trim each message and fold runs of blank lines into one; the words stay as they are."""
+    """Trim, drop markdown markup (fences, **, #) and fold blank runs. The words stay as they are."""
     text = text.replace("\r\n", "\n").strip()
-    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    text = _FENCE.sub("", text)
+    text = _BOLD.sub(r"\1", text)
+    text = _HEADING.sub("", text)
+    text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
     return _BLANKS.sub("\n\n", text)
 
 
