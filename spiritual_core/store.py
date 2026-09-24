@@ -555,14 +555,17 @@ class Store:
         end: str | None = None,
         limit: int = 20,
     ) -> list[Record]:
-        terms = [t for t in (query or "").split() if t]
-        if not terms:
+        # Space = AND between groups; "|" inside a group = OR ("难过|哭|崩 那天").
+        groups = [[a for a in t.split("|") if a] for t in (query or "").split()]
+        groups = [g for g in groups if g]
+        if not groups:
             raise StoreError("query 不能为空")
         where: list[str] = []
         args: list = []
 
-        if all(len(t) >= _TRIGRAM_MIN for t in terms):
-            match = " AND ".join('"' + t.replace('"', '""') + '"' for t in terms)
+        if all(len(a) >= _TRIGRAM_MIN for g in groups for a in g):
+            quote = lambda a: '"' + a.replace('"', '""') + '"'  # noqa: E731
+            match = " AND ".join("(" + " OR ".join(quote(a) for a in g) + ")" for g in groups)
             base = (
                 "SELECT r.* FROM records_fts f JOIN records r ON r.rowid = f.rowid"
                 " WHERE records_fts MATCH ?"
@@ -571,13 +574,13 @@ class Store:
             order = " ORDER BY bm25(records_fts), r.event_date DESC"
         else:
             base = "SELECT r.* FROM records r WHERE 1=1"
-            for t in terms:
-                like = "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-                where.append(
-                    "(r.title LIKE ? ESCAPE '\\' OR r.body LIKE ? ESCAPE '\\'"
-                    " OR r.tags LIKE ? ESCAPE '\\')"
-                )
-                args += [like, like, like]
+            one = ("(r.title LIKE ? ESCAPE '\\' OR r.body LIKE ? ESCAPE '\\'"
+                   " OR r.tags LIKE ? ESCAPE '\\' OR r.why LIKE ? ESCAPE '\\')")
+            for g in groups:
+                where.append("(" + " OR ".join([one] * len(g)) + ")")
+                for a in g:
+                    like = "%" + a.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+                    args += [like] * 4
             order = " ORDER BY r.event_date DESC, r.created_at DESC"
 
         if kinds:
@@ -604,19 +607,100 @@ class Store:
         )
         return [r for _, r in ranked[:limit]]
 
-    def wake(self) -> dict[str, list[Record]]:
-        """Titles needed to open a new window: yesterday and today, newest handoff, pins."""
+    def latest_diary(self) -> Record | None:
+        row = self.db.execute(
+            "SELECT * FROM records WHERE kind='diary' AND event_date <= ?"
+            " ORDER BY event_date DESC, created_at DESC, rowid DESC LIMIT 1",
+            (self.today().isoformat(),),
+        ).fetchone()
+        return Record.from_row(row) if row else None
+
+    def review_due(self) -> bool:
+        """Last week has records and nothing has been re-rated in the past 7 days."""
+        today = self.today()
+        start, end = weight.iso_week((today - timedelta(days=7)).isoformat())
+        has_last_week = self.db.execute(
+            "SELECT 1 FROM records WHERE event_date BETWEEN ? AND ? LIMIT 1", (start, end)
+        ).fetchone()
+        reviewed_lately = self.db.execute(
+            "SELECT 1 FROM records WHERE reviewed_at >= ? LIMIT 1",
+            ((today - timedelta(days=7)).isoformat(),),
+        ).fetchone()
+        return bool(has_last_week) and not reviewed_lately
+
+    # --- anniversaries ---
+
+    def anniversaries(self) -> list[dict]:
+        row = self.db.execute("SELECT value FROM meta WHERE key='anniversaries'").fetchone()
+        return json.loads(row[0]) if row else []
+
+    def set_anniversary(self, name: str, day: str) -> list[dict]:
+        name = (name or "").strip()
+        if not name:
+            raise StoreError("纪念日要有名字")
+        day = self._check_date(day, "day")
+        items = [a for a in self.anniversaries() if a["name"] != name]
+        items.append({"name": name, "date": day})
+        items.sort(key=lambda a: a["date"])
+        with self.db:
+            self.db.execute(
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('anniversaries', ?)",
+                (json.dumps(items, ensure_ascii=False),),
+            )
+        return items
+
+    def anniversary_lines(self) -> list[str]:
+        today = self.today()
+        out = []
+        for a in self.anniversaries():
+            d = date.fromisoformat(a["date"])
+            if d > today:
+                out.append(f"离{a['name']}还有 {(d - today).days} 天（{a['date']}）")
+                continue
+            n = (today - d).days + 1                      # the day itself is day 1
+            line = f"{a['name']}第 {n} 天（{a['date']}）"
+            months = (today.year - d.year) * 12 + today.month - d.month
+            if today.day == d.day and months > 0:
+                line += f"，今天满 {months} 个月" if months % 12 else f"，今天满 {months // 12} 年"
+            elif n % 100 == 0:
+                line += "，整百"
+            out.append(line)
+        return out
+
+    def wake(self) -> dict:
+        """What a new window needs first. Titles only; bodies come through read."""
         today = self.today()
         yesterday = today - timedelta(days=1)
+        handoff = self.latest("handoff", 1)
+        handoff_ids = {r.id for r in handoff}
         hot = {
-            "days": self.timeline(yesterday.isoformat(), today.isoformat()),
-            "handoff": self.latest("handoff", 1),
+            "days": [r for r in self.timeline(yesterday.isoformat(), today.isoformat())
+                     if r.id not in handoff_ids],
+            "handoff": handoff,
             "pinned": self.pinned(),
             "plans": self.open_plans(),
         }
+        # No diary yesterday or today: point at the newest one so the thread isn't lost.
+        hot["last_diary"] = []
+        if not any(r.kind == "diary" for r in hot["days"]):
+            if (d := self.latest_diary()) is not None:
+                hot["last_diary"] = [d]
+        month_ago = _months_back(today, 1)
+        hot["month_ago"] = self.timeline(month_ago.isoformat()) if month_ago else []
         shown = {r.id for group in hot.values() for r in group}
         hot["surfaced"] = self.surface(5, shown)
+        hot["anniversaries"] = self.anniversary_lines()
+        hot["review_due"] = self.review_due()
         return hot
+
+
+def _months_back(d: date, n: int) -> date | None:
+    """Same day n months earlier, or None when that month has no such day (e.g. 31st)."""
+    y, m = divmod(d.year * 12 + d.month - 1 - n, 12)
+    try:
+        return date(y, m + 1, d.day)
+    except ValueError:
+        return None
 
 
 def _check_kinds(kinds: list[str]) -> None:

@@ -81,14 +81,31 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         """开窗用：一次拉齐昨天+今天的记录标题、最新一份交接、钉住的记录、没做完的计划。只给标题。"""
         w = store.wake()
         now = store.now()
-        return "\n\n".join([
-            f"现在 {now:%Y-%m-%d %H:%M}（{store.tz.key}）",
+        head = f"现在 {now:%Y-%m-%d %H:%M}（{store.tz.key}）"
+        if w["anniversaries"]:
+            head += "\n" + "\n".join(w["anniversaries"])
+        parts = [
+            head,
             "【昨天和今天】\n" + _lines(w["days"], "（这两天还没有记录）"),
+        ]
+        if w["last_diary"]:
+            parts.append("【最近一篇日记】（这两天没写，线接在这里）\n" + _lines(w["last_diary"], ""))
+        parts += [
             "【最新交接】\n" + _lines(w["handoff"], "（没有交接）"),
             "【钉住的】\n" + _lines(w["pinned"], "（没有钉住的）"),
             "【没做完的计划】\n" + _lines(w["plans"], "（没有挂着的计划）"),
-            "【自己浮上来的】（分量最重的旧记忆）\n" + _lines(w["surfaced"], "（还没有）"),
-        ])
+        ]
+        if w["month_ago"]:
+            parts.append("【一个月前的今天】\n" + _lines(w["month_ago"], ""))
+        parts.append("【自己浮上来的】（分量最重的旧记忆）\n" + _lines(w["surfaced"], "（还没有）"))
+        first = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
+        first = [r.id for r in first] + [r.id for r in w["handoff"]]
+        tail = f"先读：{'、'.join(first)}" if first else ""
+        if w["review_due"]:
+            tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
+        if tail:
+            parts.append(tail)
+        return "\n\n".join(parts)
 
     @mcp.tool()
     @guarded
@@ -102,7 +119,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
     @mcp.tool()
     @guarded
     def search(query: str, kinds: list[str] | None = None, start: str = "", end: str = "") -> str:
-        """按内容搜，中文可用。空格分开的多个词要同时出现。可加 kinds 和日期范围收窄。只返回标题。"""
+        """按内容搜，中文可用，只返回标题。空格分开的词要同时出现；用 | 连起来的是「或」，
+        换了说法也能一次搜齐，比如「难过|哭|崩 那天」。可加 kinds 和日期范围收窄。"""
         records = store.search(query, kinds, start or None, end or None)
         return _lines(records, f"没搜到「{query}」。")
 
@@ -227,6 +245,13 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
                 marks += f" · 她{r.human_rating}"
             lines.append(f"{_line(r)}\n    {marks} · 读过{r.read_count}次 · {layer} {s}")
         return "\n".join(lines)
+
+    @mcp.tool()
+    @guarded
+    def anniversary(name: str, day: str) -> str:
+        """记一个纪念日（同名的会被改掉）。wake 会每天报第几天、满几个月。day 用 YYYY-MM-DD。"""
+        items = store.set_anniversary(name, day)
+        return "记好了：" + "、".join(f"{a['name']} {a['date']}" for a in items)
 
     @mcp.tool()
     @guarded

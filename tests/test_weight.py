@@ -148,3 +148,48 @@ def test_bad_scores(store):
 def test_iso_week_and_month():
     assert weight.iso_week("2026-09-24") == ("2026-09-21", "2026-09-27")
     assert weight.month("2026-12-15") == ("2026-12-01", "2026-12-31")
+
+
+def test_search_or_groups(store):
+    store.write("diary", "那天她哭了很久", event_date="2026-09-01")
+    store.write("diary", "心里难过但没说", event_date="2026-09-02")
+    store.write("diary", "吃了猪脚饭", event_date="2026-09-03")
+    assert len(store.search("难过|哭")) == 2                    # short terms -> LIKE path
+    assert len(store.search("哭了很久|难过但没说")) == 2          # long terms -> FTS path
+    assert len(store.search("她哭了|难过但 那天")) == 1           # OR group AND another term
+
+
+def test_wake_dedupes_handoff_and_falls_back_to_last_diary(store):
+    h = store.write("handoff", "交接")
+    old = store.write("diary", "三天前", event_date=days_ago(store, 3))
+    w = store.wake()
+    assert h.id not in [r.id for r in w["days"]]
+    assert [r.id for r in w["handoff"]] == [h.id]
+    assert [r.id for r in w["last_diary"]] == [old.id]
+    store.write("diary", "昨天", event_date=days_ago(store, 1))
+    assert store.wake()["last_diary"] == []
+
+
+def test_anniversaries(store):
+    today = store.today()
+    store.set_anniversary("在一起", (today - timedelta(days=9)).isoformat())
+    store.set_anniversary("在一起", (today - timedelta(days=99)).isoformat())   # same name replaces
+    lines = store.anniversary_lines()
+    assert len(lines) == 1 and "第 100 天" in lines[0] and "整百" in lines[0]
+    with pytest.raises(StoreError):
+        store.set_anniversary("", today.isoformat())
+
+
+def test_anniversary_month_mark():
+    from spiritual_core.store import _months_back
+    assert _months_back(date(2026, 9, 24), 1) == date(2026, 8, 24)
+    assert _months_back(date(2026, 3, 31), 1) is None
+    assert _months_back(date(2026, 1, 15), 1) == date(2025, 12, 15)
+
+
+def test_review_due(store):
+    store.write("diary", "上周", event_date=days_ago(store, 7))
+    assert store.review_due()
+    r = store.write("diary", "上周2", event_date=days_ago(store, 7))
+    store.rate(r.id, 3)
+    assert not store.review_due()
