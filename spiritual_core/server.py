@@ -127,7 +127,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             parts.append("【一个月前的今天】\n" + _lines(w["month_ago"], ""))
         parts.append("【自己浮上来的】（分量最重的旧记忆）\n" + _lines(w["surfaced"], "（还没有）"))
         first = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
-        first = [r.id for r in first] + [r.id for r in w["handoff"]]
+        # what's pinned is read every time, before the day's diary
+        first = ([r.id for r in w["pinned"]] + [r.id for r in first]
+                 + [r.id for r in w["handoff"]])
         tail = f"先读：{'、'.join(first)}" if first else ""
         if (n_locked := store.locked_count()):
             tail += ("\n" if tail else "") + f"你锁着 {n_locked} 条心里话（timeline/search 里标着 [锁着]）。"
