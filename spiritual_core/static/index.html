@@ -44,6 +44,10 @@
   }
   * { box-sizing: border-box; }
   html { background: var(--bar, var(--bg)); }
+  /* A short page (翻看 while it loads) still fills the screen, and no rubber band past the
+     edges, so the plain base color under the sky never shows as a loose strip. */
+  html, body { overscroll-behavior: none; }
+  body { min-height: 100lvh; }
   html, body { margin: 0; color: var(--ink); }
   /* The sky reaches under the iPhone status bar and home bar too, so the top blends with the page. */
   :root { --reach-t: calc(-1 * env(safe-area-inset-top, 0px)); --reach-b: calc(-1 * env(safe-area-inset-bottom, 0px)); }
