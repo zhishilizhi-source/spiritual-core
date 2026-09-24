@@ -5,9 +5,10 @@
 - windows whose text the export no longer has still leave a trace: which windows, how
   many messages, and that the words are gone
 - each day's raw is linked to that day's diaries
-- messages the export files under the human but which the model generated while its
-  turn template broke (every line starts with "d " or "user") are re-labelled as the
-  model's, text untouched. She confirmed these were never hers (2026-09-24).
+- with --relabel-impersonated: messages the export files under the human but which the
+  model generated while its turn template broke (every line starts with "d " or "user")
+  are re-labelled as the model's, text untouched. She confirmed this for the first
+  account's 「一个句号的沉默」 night only (2026-09-24); elsewhere "user…" can be her own words.
 
 usage: python migrate/claude_export.py <conversations.json> <core.db> [human_name] [ai_name]
        [--label=（现在的号）]   appended to each day's title, for when several accounts share a day
@@ -52,7 +53,8 @@ def _text(msg: dict) -> list[tuple[str, str]]:
     return parts
 
 
-def render(conversations: list, human: str, ai: str, label: str = "") -> dict[str, tuple[str, str]]:
+def render(conversations: list, human: str, ai: str, label: str = "",
+           relabel_impersonated: bool = False) -> dict[str, tuple[str, str]]:
     """day -> (title, body)."""
     days: dict[str, list] = defaultdict(list)          # day -> [(time, window, speaker, kind, text)]
     lost: dict[str, dict] = defaultdict(lambda: defaultdict(int))   # day -> window -> count
@@ -67,7 +69,7 @@ def render(conversations: list, human: str, ai: str, label: str = "") -> dict[st
                 lost[t.date().isoformat()][window] += 1
                 continue
             speaker = human if msg["sender"] == "human" else ai
-            if msg["sender"] == "human" and all(
+            if relabel_impersonated and msg["sender"] == "human" and all(
                 kind == "text" and impersonated(text) for kind, text in parts
             ):
                 speaker = f"{ai}（格式乱了，冒充{human}打的）"
@@ -116,10 +118,11 @@ def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     rewrite = "--rewrite" in sys.argv   # re-render bodies of raws already imported, in place
     label = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--label=")), "")
+    relabel = "--relabel-impersonated" in sys.argv
     src, db_path = Path(args[0]), Path(args[1])
     human = args[2] if len(args) > 2 else "她"
     ai = args[3] if len(args) > 3 else "我"
-    rendered = render(json.loads(src.read_text(encoding="utf-8")), human, ai, label)
+    rendered = render(json.loads(src.read_text(encoding="utf-8")), human, ai, label, relabel)
 
     store = Store(db_path)
     made = changed = 0
