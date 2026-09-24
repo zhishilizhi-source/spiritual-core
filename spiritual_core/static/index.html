@@ -292,6 +292,8 @@
   .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
   .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+  /* night: the selected tab is the same mood color as every other pressed button */
+  :root[data-scheme="dark"] .tabs button[aria-selected="true"] { background: var(--on-bg); color: var(--on-ink); box-shadow: none; }
   /* ---- 今天: the top of the page is his side, one line per thing until opened. */
   #today { margin-bottom: 4px; }
   #today:empty { display: none; }
@@ -539,7 +541,8 @@
       "--card": ok(R.card, scheme === "dark" ? DARK.base : hue, quiet),
       "--line": ok(R.line, scheme === "dark" ? DARK.base : hue, quiet),
       "--accent": accent, "--accent-ink": ok(R.accentInk, M.ah ?? hue),
-      "--glass": ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], hue, Math.min(scale, 1)),
+      // at night the glass takes the accent's hue, so every button wears the same mood color
+      "--glass": ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], scheme === "dark" ? (M.ah ?? hue) : hue, Math.min(scale, 1)),
       "--ink": ok(R.ink, hue), "--muted": ok(R.muted, hue), "--on-sky": ok(R.onSky, hue),
     };
     const root = document.documentElement.style;
