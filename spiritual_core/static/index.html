@@ -12,6 +12,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f7e2d8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#2e2743" media="(prefers-color-scheme: dark)">
+<script>
+  // Before first paint: auto follows the phone, or her explicit choice (remembered on this device).
+  (() => {
+    let t = "auto";
+    try { t = localStorage.getItem("sc-theme") || "auto"; } catch {}
+    const dark = t === "dark" || (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.scheme = dark ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
 <style>
   /* Dusk sinking into night, same sky as the icon. */
   :root {
@@ -21,13 +31,11 @@
     --radius: 14px;
     color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
+  :root[data-scheme="dark"] {
       --sky-top: #3a2b40; --sky-bottom: #1d1829; --on-sky: #cfc8dc;
       --bg: #221e33; --card: #2d2842; --ink: #f1e9e2; --muted: #a8a0b9;
       --line: #3e3757; --accent: #eb9d83; --accent-ink: #2a2440; --ok: #8cc39a; --bad: #ec8577;
       color-scheme: dark;
-    }
   }
   * { box-sizing: border-box; }
   html { background: var(--bg); }
@@ -61,6 +69,11 @@
   @keyframes drift-b { from { transform: translate(0, 0) scale(1.08); opacity: .7; }
                        to   { transform: translate(-8vw, -7vh) scale(.96); opacity: .95; } }
   @media (prefers-reduced-motion: reduce) { body::before, body::after { animation: none; } }
+  .theme { margin-left: auto; display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+           background: var(--surface); border: 1px solid var(--surface-rim); align-self: center; }
+  .theme button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px;
+                  font-weight: 400; letter-spacing: 0; padding: 4px 9px; border-radius: 999px; cursor: pointer; }
+  .theme button[aria-pressed="true"] { background: var(--on-bg); color: var(--on-ink); font-weight: 600; }
   .mood { margin: -4px 0 14px; }
   .mood-now { font-size: 14px; color: var(--on-sky); }
   .mood-now b { color: var(--ink); font-weight: 600; }
@@ -105,7 +118,7 @@
                     0 6px 20px color-mix(in oklch, var(--glass) 30%, transparent);
         -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); }
   :root { --glass: #e8a88f; --glass-a: 42%; --glass-b: 18%; --glass-rim: 60%; }
-  @media (prefers-color-scheme: dark) { :root { --glass-a: 20%; --glass-b: 9%; --glass-rim: 18%; } }
+  :root[data-scheme="dark"] { --glass-a: 20%; --glass-b: 9%; --glass-rim: 18%; }
   .go:disabled { opacity: .5; }
   .msg { min-height: 22px; font-size: 14px; margin-top: 10px; text-align: center; }
   .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
@@ -172,14 +185,12 @@
     --field-line: color-mix(in oklch, var(--line) 80%, transparent);
     --on-bg: var(--glass); --on-ink: var(--ink);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
+  :root[data-scheme="dark"] {
       --surface: color-mix(in oklch, var(--card) 60%, transparent);
       --surface-rim: color-mix(in oklch, white 10%, transparent);
       --surface-shadow: 0 8px 24px rgba(0, 0, 0, .28);
       --field: color-mix(in oklch, black 16%, transparent);
       --on-bg: var(--accent); --on-ink: var(--accent-ink);
-    }
   }
   .card, .rec, .item, .tabs, .search input, .search button, .more {
     background: var(--surface); border: 1px solid var(--surface-rim); box-shadow: var(--surface-shadow);
@@ -211,7 +222,10 @@
 </style>
 </head>
 <body>
-  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span></h1>
+  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span>
+    <span class="theme" role="group" aria-label="深浅">
+      <button type="button" data-theme="auto">自动</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
+    </span></h1>
 
   <section class="mood" aria-label="心情">
     <div class="mood-now" id="moodNow">今天心情怎么样？点一下，天会跟着变。</div>
@@ -317,22 +331,31 @@
   // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
   const PHASE = { dawn: [75, 230], day: [60, 210], dusk: [40, 300], night: [285, 265] };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+  const isDark = () => document.documentElement.dataset.scheme === "dark";
+  function applyTheme(t) {
+    const dark = t === "dark" || (t === "auto" && darkQuery.matches);
+    document.documentElement.dataset.scheme = dark ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+    try { localStorage.setItem("sc-theme", t); } catch {}
+    document.querySelectorAll(".theme button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
+    paintSky();
+  }
   let currentMood = null;
 
   const ok = ([l, c], h, scale = 1) => `oklch(${l} ${(c * scale).toFixed(3)} ${h})`;
   function phase(h) { return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night"; }
-  const moodDot = (m) => ok(ROLES[darkQuery.matches ? "dark" : "light"].dot, MOOD[m].ah ?? MOOD[m].h,
+  const moodDot = (m) => ok(ROLES[isDark() ? "dark" : "light"].dot, MOOD[m].ah ?? MOOD[m].h,
     MOOD[m].ac ? 1.1 : Math.min(MOOD[m].s, 1));
 
   function paintSky() {
-    const scheme = darkQuery.matches ? "dark" : "light";
+    const scheme = isDark() ? "dark" : "light";
     const R = ROLES[scheme];
     const [phaseTop, phaseBottom] = PHASE[phase(new Date().getHours())];
     const M = (currentMood && MOOD[currentMood]) || { h: phaseTop, s: 1 };
     const hue = M.h, scale = M.s;
     // Dark yellow is brown: in the dark scheme, yellow hues stay quiet in the surfaces
     // and let the accent and dots carry the color.
-    const quiet = darkQuery.matches && hue >= 55 && hue <= 125 ? 0.5 : 1;
+    const quiet = isDark() && hue >= 55 && hue <= 125 ? 0.5 : 1;
     // mood-specific depth (想你/馋/开心) now lives in the glow, not in a flat sky
     const glowA = M.top ? ok([M.top[scheme][0] - (scheme === "dark" ? -0.04 : 0.01), M.top[scheme][1] + 0.02], hue)
                         : ok(R.glowA, hue, scale * quiet);
@@ -374,7 +397,12 @@
     const b = ev.target.closest("#moodChips button");
     if (b && b.dataset.mood !== currentMood) loadMood(b.dataset.mood);
   });
-  darkQuery.addEventListener("change", paintSky);
+  darkQuery.addEventListener("change", () => applyTheme(document.documentElement.dataset.theme || "auto"));
+  document.querySelector(".theme").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (b) applyTheme(b.dataset.theme);
+  });
+  document.querySelectorAll(".theme button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.theme === (document.documentElement.dataset.theme || "auto"))));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMood(); });
   setInterval(paintSky, 10 * 60 * 1000);
   paintSky();
