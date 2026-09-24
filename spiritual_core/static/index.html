@@ -359,6 +359,12 @@
   form.card .hint { margin-top: 4px; }
   .go { margin-top: 10px; padding: 10px; }
   .msg { min-height: 0; margin-top: 6px; }
+  /* The three forms run to the bottom of the screen, all the same height; the main field takes
+     the spare room, which leaves the button at the bottom. 最近存的 starts below the fold. */
+  form.card { display: flex; flex-direction: column; min-height: var(--form-h, auto); }
+  #photo .pick, #words #w, #write #wb { flex: 1 0 auto; }
+  form.card textarea.words { min-height: 72px; }
+  #words #why { min-height: 0 !important; height: 52px; }
 </style>
 </head>
 <body>
@@ -428,7 +434,7 @@
   <form id="words" class="card" hidden>
     <label for="w">原话</label>
     <textarea id="w" class="words" name="words"
-      placeholder="逐字贴进来，带上是谁说的&#10;她：……&#10;陆能：……"></textarea>
+      placeholder="逐字贴进来，带上是谁说的&#10;她：……　陆能：……"></textarea>
     <div class="hint">原样存，一个字都不会改。</div>
     <label for="why">为什么想留（可以不写）</label>
     <textarea id="why" name="why" style="min-height:60px"></textarea>
@@ -1166,6 +1172,18 @@
     try { renderToday(await (await fetch("api/today")).json()); } catch {}
   }
   loadToday();
+
+  // Size the forms to reach the bottom of the screen from wherever they start.
+  function fitForms() {
+    const f = [...document.querySelectorAll("form.card")].find((x) => !x.hidden);
+    if (!f) return;
+    const pad = parseFloat(getComputedStyle(document.body).paddingBottom) || 24;
+    const h = Math.round(innerHeight - (f.getBoundingClientRect().top + scrollY) - pad);
+    document.documentElement.style.setProperty("--form-h", Math.max(h, 0) + "px");
+  }
+  addEventListener("resize", fitForms);
+  new ResizeObserver(fitForms).observe($("#today"));
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", fitForms));
 
   async function loadRecent() {
     try {
