@@ -81,6 +81,8 @@
   @keyframes drift-b { from { transform: translate(0, 0) scale(1.08); opacity: .7; }
                        to   { transform: translate(-8vw, -7vh) scale(.96); opacity: .95; } }
   @media (prefers-reduced-motion: reduce) { body::before, body::after { animation: none; } }
+  /* Night is quiet: no colored lights, only the sky and a few stars. */
+  :root[data-scheme="dark"] body::before, :root[data-scheme="dark"] body::after { display: none; }
   .theme { margin-left: auto; display: flex; gap: 2px; padding: 3px; border-radius: 999px;
            background: var(--surface); border: 1px solid var(--surface-rim); align-self: center; }
   :root[data-scheme="dark"] .theme { background: color-mix(in oklch, var(--card) 97%, transparent); }
@@ -221,12 +223,8 @@
   /* at night the glass thins out so the stars come through, softly */
   :root[data-scheme="dark"] .card, :root[data-scheme="dark"] .rec, :root[data-scheme="dark"] .item,
   :root[data-scheme="dark"] .tabs {
-    background: color-mix(in oklch, var(--card) 24%, transparent);
-    -webkit-backdrop-filter: blur(3px) saturate(120%); backdrop-filter: blur(3px) saturate(120%); }
-  /* a faint shadow under text so a star behind a word never washes it out */
-  :root[data-scheme="dark"] .card, :root[data-scheme="dark"] .rec, :root[data-scheme="dark"] .item,
-  :root[data-scheme="dark"] h1, :root[data-scheme="dark"] .mood, :root[data-scheme="dark"] .day,
-  :root[data-scheme="dark"] h2 { text-shadow: 0 0 6px rgba(0, 0, 0, .55), 0 0 2px rgba(0, 0, 0, .4); }
+    background: color-mix(in oklch, var(--card) 62%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   .tabs { border-radius: 16px; padding: 5px; }
   .tabs button { border-radius: 12px; }
   .tabs button[aria-selected="true"] { background: color-mix(in oklch, var(--glass) 38%, var(--card));
@@ -347,7 +345,7 @@
     dark:  { skyTop: [0.20, 0.045], skyBottom: [0.13, 0.035], glowA: [0.27, 0.04], glowB: [0.26, 0.045],
              bg: [0.16, 0.035], card: [0.30, 0.018],
              line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
-             muted: [0.84, 0.02], onSky: [0.88, 0.022], dot: [0.78, 0.12] },
+             muted: [0.78, 0.02], onSky: [0.86, 0.022], dot: [0.78, 0.12] },
   };
   // h: hue, s: chroma scale. Optional per mood: top = sky-top [L, C] per scheme (a deeper,
   // stickier sky), ah/ac = accent hue and chroma. Overrides were contrast-checked on their own.
@@ -450,6 +448,8 @@
   const cosmos = (() => {
     const cv = document.getElementById("cosmos"), ctx = cv.getContext("2d");
     const still = matchMedia("(prefers-reduced-motion: reduce)");
+    // She found the busy sky ugly: the night stays quiet. The richer pieces are kept behind this switch.
+    const QUIET = true;
     // mostly white; a little ice blue, pale gold, faint pink, faint cyan
     const TINTS = [["255,255,255", 60], ["196,214,255", 15], ["255,228,188", 12], ["255,205,226", 8], ["196,240,255", 5]];
     const tint = () => { let k = rnd() * 100; for (const [c, w] of TINTS) { if ((k -= w) < 0) return c; } return TINTS[0][0]; };
@@ -526,32 +526,37 @@
         grd.addColorStop(0, `rgba(${rgb},${a})`); grd.addColorStop(1, `rgba(${rgb},0)`);
         g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
       };
+      if (QUIET) { /* no milky way, no nebula */ } else
       for (let i = 0; i < 30; i++) {                     // the band's glow
         const [x, y] = along(i / 29);
         cloud(x, y, Math.min(W, H) * (0.14 + rnd() * 0.1), "185,178,238", 0.05 + rnd() * 0.05);
       }
+      if (!QUIET)
       for (let i = 0; i < 9; i++) {                      // wisps of pink and blue beside it
         const [bx, by] = along(0.1 + rnd() * 0.8), off = gauss() * Math.min(W, H) * 0.12;
         cloud(bx + off * 0.7, by + off, Math.min(W, H) * (0.08 + rnd() * 0.12),
               rnd() < 0.5 ? "240,160,205" : "140,170,255", 0.04 + rnd() * 0.05);
       }
       twinkles = [];
-      const field = Math.round(W * H / 1100), dust = Math.round(W * H / 420);
+      const field = Math.round(W * H / (QUIET ? 2600 : 1100)), dust = QUIET ? 0 : Math.round(W * H / 420);
       for (let i = 0; i < field + dust; i++) {
         const isDust = i >= field;
         let x, y;
         if (isDust) { const [bx, by] = along(rnd()); const off = gauss() * Math.min(W, H) * 0.08; x = bx + off * 0.7; y = by + off; }
         else { x = rnd() * W; y = rnd() * H; }
         // heavy-tailed sizes: a sky of fine points, a few medium, very few bright
-        const r = isDust ? 0.2 + rnd() * 0.35 : 0.22 + 1.7 * Math.pow(rnd(), 5);
+        const r = isDust ? 0.2 + rnd() * 0.35 : QUIET ? 0.25 + 0.75 * Math.pow(rnd(), 3) : 0.22 + 1.7 * Math.pow(rnd(), 5);
         const s = { x, y, r, c: tint(), a: isDust ? 0.1 + rnd() * 0.3 : Math.min(1, 0.35 + r * 0.45 + rnd() * 0.25),
-          halo: r > 0.75, spikes: r > 1.72 ? 5 + rnd() * 3 : 0, ph: rnd() * 6.2832, sp: 0.3 + rnd() * 0.8 };
+          halo: !QUIET && r > 0.75, spikes: !QUIET && r > 1.72 ? 5 + rnd() * 3 : 0,
+          ph: rnd() * 6.2832, sp: 0.2 + rnd() * 0.5 };
         if (!isDust && (r > 0.6 ? rnd() < 0.45 : rnd() < 0.08)) twinkles.push(s);
         else dot(g, s.x, s.y, s.r, s.a, s.c, s.halo, s.spikes);
       }
       // big and half out of frame at the top-right corner, like it's rising into the sky
-      const mr = Math.min(W, H) * 0.2;
-      g.globalAlpha = 0.72; moon(g, W - mr * 0.28, mr * 0.42, mr); g.globalAlpha = 1;
+      if (!QUIET) {
+        const mr = Math.min(W, H) * 0.2;
+        g.globalAlpha = 0.72; moon(g, W - mr * 0.28, mr * 0.42, mr); g.globalAlpha = 1;
+      }
     }
 
     function frame(t) {
@@ -567,7 +572,7 @@
       if (!still.matches) {
         if (!meteor && secs > nextMeteor) {
           meteor = { x: W * (0.3 + Math.random() * 0.7), y: H * Math.random() * 0.35, born: secs, life: 0.9 };
-          nextMeteor = secs + 25 + Math.random() * 35;
+          nextMeteor = secs + 40 + Math.random() * 50;
         }
         if (meteor) {
           const k = (secs - meteor.born) / meteor.life;
@@ -575,7 +580,7 @@
           else {
             const hx = meteor.x - k * 220, hy = meteor.y + k * 120, len = 90;
             const grd = ctx.createLinearGradient(hx, hy, hx + len, hy - len * 0.55);
-            grd.addColorStop(0, `rgba(255,255,255,${0.75 * (1 - k)})`); grd.addColorStop(1, "rgba(255,255,255,0)");
+            grd.addColorStop(0, `rgba(255,255,255,${0.55 * (1 - k)})`); grd.addColorStop(1, "rgba(255,255,255,0)");
             ctx.strokeStyle = grd; ctx.lineWidth = 1.2; ctx.beginPath();
             ctx.moveTo(hx, hy); ctx.lineTo(hx + len, hy - len * 0.55); ctx.stroke();
           }
