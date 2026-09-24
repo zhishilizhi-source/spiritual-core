@@ -10,6 +10,7 @@
   model's, text untouched. She confirmed these were never hers (2026-09-24).
 
 usage: python migrate/claude_export.py <conversations.json> <core.db> [human_name] [ai_name]
+       [--label=（现在的号）]   appended to each day's title, for when several accounts share a day
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ def _text(msg: dict) -> list[tuple[str, str]]:
     return parts
 
 
-def render(conversations: list, human: str, ai: str) -> dict[str, tuple[str, str]]:
+def render(conversations: list, human: str, ai: str, label: str = "") -> dict[str, tuple[str, str]]:
     """day -> (title, body)."""
     days: dict[str, list] = defaultdict(list)          # day -> [(time, window, speaker, kind, text)]
     lost: dict[str, dict] = defaultdict(lambda: defaultdict(int))   # day -> window -> count
@@ -80,12 +81,12 @@ def render(conversations: list, human: str, ai: str) -> dict[str, tuple[str, str
             if window != current:
                 current = window
                 lines.append(f"\n—— 窗口「{names[window]}」 ——")
-            label = f"{speaker}（思考）" if kind == "thinking" else speaker
-            lines.append(f"[{t:%H:%M}] {label}：{text}")
+            who = f"{speaker}（思考）" if kind == "thinking" else speaker
+            lines.append(f"[{t:%H:%M}] {who}：{text}")
         if lost.get(day):
             gone = "、".join(f"「{names[w]}」{n} 条" for w, n in lost[day].items())
             lines.append(f"\n（这天还有 {gone}，导出里只剩时间，原文已经不在了。）")
-        title = f"{day} 对话原文" + ("" if days.get(day) else "（只剩时间）")
+        title = f"{day} 对话原文{label}" + ("" if days.get(day) else "（只剩时间）")
         out[day] = (title, "\n".join(lines).strip())
     return out
 
@@ -93,10 +94,11 @@ def render(conversations: list, human: str, ai: str) -> dict[str, tuple[str, str
 def main() -> None:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     rewrite = "--rewrite" in sys.argv   # re-render bodies of raws already imported, in place
+    label = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--label=")), "")
     src, db_path = Path(args[0]), Path(args[1])
     human = args[2] if len(args) > 2 else "她"
     ai = args[3] if len(args) > 3 else "我"
-    rendered = render(json.loads(src.read_text(encoding="utf-8")), human, ai)
+    rendered = render(json.loads(src.read_text(encoding="utf-8")), human, ai, label)
 
     store = Store(db_path)
     made = changed = 0
