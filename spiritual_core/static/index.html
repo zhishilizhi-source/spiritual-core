@@ -340,6 +340,29 @@
   :root[data-theme="plain"] .theme { background: var(--card); border-color: var(--line); }
   :root[data-theme="plain"] .mood .chips button { background: var(--card); }
   :root[data-theme="plain"] h1 img { box-shadow: none; }
+  /* 极简·夜: ink black with one soft light from above, hairline edges that catch it,
+     white as the primary color and a pale lilac for the small words. */
+  :root[data-theme="plain"][data-scheme="dark"] {
+    --bg: #09090b; --card: #131316; --ink: #f5f5f7; --muted: #9d9da8; --on-sky: #9d9da8;
+    --line: rgba(255, 255, 255, .08); --accent: #c9b8ff; --accent-ink: #09090b;
+    --on-bg: #f5f5f7; --on-ink: #09090b; --field: rgba(255, 255, 255, .035); --field-line: rgba(255, 255, 255, .07);
+  }
+  :root[data-theme="plain"][data-scheme="dark"]::before {
+    background: radial-gradient(120% 60% at 50% -10%, rgba(201, 184, 255, .10), transparent 60%),
+                var(--bg) !important; }
+  :root[data-theme="plain"][data-scheme="dark"] :is(.card, .rec, .item, .tabs) {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, .035), rgba(255, 255, 255, .012)), var(--card);
+    border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 30px rgba(0, 0, 0, .35); }
+  :root[data-theme="plain"][data-scheme="dark"] .tabs { padding: 4px; }
+  :root[data-theme="plain"][data-scheme="dark"] .tabs button[aria-selected="true"] {
+    background: rgba(255, 255, 255, .09); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+  :root[data-theme="plain"][data-scheme="dark"] :is(textarea, input[type=date], .pick) {
+    background: var(--field); border-color: var(--field-line); }
+  :root[data-theme="plain"][data-scheme="dark"] .pick { border-color: rgba(255, 255, 255, .14); }
+  :root[data-theme="plain"][data-scheme="dark"] .go { background: var(--on-bg); color: var(--on-ink);
+    box-shadow: 0 6px 24px rgba(201, 184, 255, .18); }
+  :root[data-theme="plain"][data-scheme="dark"] .theme button[aria-pressed="true"] { background: var(--on-bg); color: var(--on-ink); }
+  :root[data-theme="plain"][data-scheme="dark"] .layer.new { background: var(--accent); color: var(--accent-ink); }
   /* ---- First impression: everything she can do fits on the first screen of a phone. */
   h1 { margin: 6px 0 14px; }
   h1 img { width: 38px; height: 38px; border-radius: 10px; }
