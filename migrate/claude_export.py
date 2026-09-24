@@ -5,6 +5,9 @@
 - windows whose text the export no longer has still leave a trace: which windows, how
   many messages, and that the words are gone
 - each day's raw is linked to that day's diaries
+- messages the export files under the human but which the model generated while its
+  turn template broke (every line starts with "d " or "user") are re-labelled as the
+  model's, text untouched. She confirmed these were never hers (2026-09-24).
 
 usage: python migrate/claude_export.py <conversations.json> <core.db> [human_name] [ai_name]
 """
@@ -12,6 +15,7 @@ usage: python migrate/claude_export.py <conversations.json> <core.db> [human_nam
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -23,6 +27,12 @@ from spiritual_core.store import Store  # noqa: E402
 
 BEIJING = timezone(timedelta(hours=8))
 TAG = "对话原文"
+_IMPERSONATED = re.compile(r"^(d\s|user)", re.I)
+
+
+def impersonated(text: str) -> bool:
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    return bool(lines) and all(_IMPERSONATED.match(ln) for ln in lines)
 
 
 def _local(ts: str) -> datetime:
@@ -41,12 +51,8 @@ def _text(msg: dict) -> list[tuple[str, str]]:
     return parts
 
 
-def main() -> None:
-    src, db_path = Path(sys.argv[1]), Path(sys.argv[2])
-    human = sys.argv[3] if len(sys.argv) > 3 else "她"
-    ai = sys.argv[4] if len(sys.argv) > 4 else "我"
-    conversations = json.loads(src.read_text(encoding="utf-8"))
-
+def render(conversations: list, human: str, ai: str) -> dict[str, tuple[str, str]]:
+    """day -> (title, body)."""
     days: dict[str, list] = defaultdict(list)          # day -> [(time, window, speaker, kind, text)]
     lost: dict[str, dict] = defaultdict(lambda: defaultdict(int))   # day -> window -> count
     names = {}
@@ -60,11 +66,14 @@ def main() -> None:
                 lost[t.date().isoformat()][window] += 1
                 continue
             speaker = human if msg["sender"] == "human" else ai
+            if msg["sender"] == "human" and all(
+                kind == "text" and impersonated(text) for kind, text in parts
+            ):
+                speaker = f"{ai}（格式乱了，冒充{human}打的）"
             for kind, text in parts:
                 days[t.date().isoformat()].append((t, window, speaker, kind, text))
 
-    store = Store(db_path)
-    made = 0
+    out = {}
     for day in sorted(set(days) | set(lost)):
         lines, current = [], None
         for t, window, speaker, kind, text in sorted(days.get(day, []), key=lambda x: x[0]):
@@ -76,15 +85,36 @@ def main() -> None:
         if lost.get(day):
             gone = "、".join(f"「{names[w]}」{n} 条" for w, n in lost[day].items())
             lines.append(f"\n（这天还有 {gone}，导出里只剩时间，原文已经不在了。）")
-        body = "\n".join(lines).strip()
         title = f"{day} 对话原文" + ("" if days.get(day) else "（只剩时间）")
+        out[day] = (title, "\n".join(lines).strip())
+    return out
+
+
+def main() -> None:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    rewrite = "--rewrite" in sys.argv   # re-render bodies of raws already imported, in place
+    src, db_path = Path(args[0]), Path(args[1])
+    human = args[2] if len(args) > 2 else "她"
+    ai = args[3] if len(args) > 3 else "我"
+    rendered = render(json.loads(src.read_text(encoding="utf-8")), human, ai)
+
+    store = Store(db_path)
+    made = changed = 0
+    for day, (title, body) in rendered.items():
+        if rewrite:
+            with store.db:
+                changed += store.db.execute(
+                    "UPDATE records SET body=?, updated_at=? WHERE kind='raw' AND title=?"
+                    " AND body<>?",
+                    (body, store.now().isoformat(timespec="seconds"), title, body),
+                ).rowcount
+            continue
         rec = store.write("raw", body, event_date=day, title=title, tags=[TAG])
         for diary in store.timeline(day, kinds=["diary"]):
             store.link(rec.id, diary.id)
         made += 1
     store.close()
-    print(f"{made} 天的原文，{sum(len(v) for v in days.values())} 段有字，"
-          f"{sum(sum(v.values()) for v in lost.values())} 条只剩时间")
+    print(f"改写了 {changed} 天" if rewrite else f"{made} 天的原文")
 
 
 if __name__ == "__main__":
