@@ -76,7 +76,7 @@
   .chips button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
   .day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 18px 0 8px; }
   .rec { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-         margin-bottom: 8px; overflow: hidden; }
+         margin-bottom: 8px; }
   .rec summary { list-style: none; cursor: pointer; padding: 11px 14px; display: flex; gap: 10px;
                  align-items: baseline; }
   .rec summary::-webkit-details-marker { display: none; }
@@ -86,6 +86,11 @@
   .rec .full { padding: 0 14px 14px; }
   .rec .full img { max-width: 100%; border-radius: 10px; display: block; margin-bottom: 10px; }
   .more { width: 100%; margin-top: 12px; }
+  .close-wrap { position: sticky; bottom: max(16px, env(safe-area-inset-bottom)); display: flex;
+                justify-content: flex-end; margin-top: 12px; pointer-events: none; }
+  .close { pointer-events: auto; border: 0; border-radius: 999px; padding: 8px 18px; font: inherit;
+           font-size: 14px; background: var(--ink); color: var(--bg); cursor: pointer;
+           box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
   .tick { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); align-self: center; }
   .t.done { text-decoration: line-through; color: var(--muted); }
   .rate { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); }
@@ -207,6 +212,14 @@
     if (id) fetch("api/seen/" + id, { method: "POST" }).catch(() => {});
   }, true);
   $("#shelf").addEventListener("click", async (ev) => {
+    const close = ev.target.closest(".close");
+    if (close) {
+      const d = close.closest("details");
+      d.open = false;
+      const top = d.getBoundingClientRect().top;
+      if (top < 0) d.scrollIntoView({ block: "start", behavior: "instant" });
+      return;
+    }
     const dot = ev.target.closest(".rate button");
     if (dot) {
       const row = dot.parentElement, n = Number(dot.dataset.rate);
@@ -284,7 +297,8 @@
       <div class="full">${img}<div class="body">${esc(it.body)}</div>
       ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
-      ${rateHtml(it)}</div></details>`;
+      ${rateHtml(it)}
+      <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`;
   }
 
   async function loadBrowse(first) {
