@@ -59,6 +59,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             "Spiritual Core 是记忆库。开新窗口先调 wake，只拿标题；"
             "要看正文再用 read。按日期找东西用 timeline，按内容找用 search。"
             "写入用 write：event_date 填事情发生的那天，不是现在。写入永远新建，不会并进旧记录。"
+            "长文超过大约 800 字时，先 write 第一段，再用 append 分几次接上——还是一条完整记录，一次太长会超时。"
         ),
         host=host,
         port=port,
@@ -194,7 +195,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         title 不填时：diary 自动叫「日期 日记」，handoff 叫「日期 交接」，其他取正文第一行。
         link_to 填其他记录的 id，把它们挂在一起（比如日记挂当天原文）。
         importance 1-5，写的时候我打的分，只算草稿，回看时用 rate 改。5 分每周最多两条。
-        不填就按类型给默认分。"""
+        不填就按类型给默认分。
+        长文（大约超过 800 字）先写第一段，再用 append 接上，别一次塞进来，会超时。"""
         if kind == "excerpt":
             return "没做成：原话节选用 keep。"
         if kind == "inner":
@@ -204,6 +206,15 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         r = store.write(kind, body, event_date or None, title or None, tags, pinned, link_to,
                         kept_by=author, importance=importance)
         return f"写好了：{_line(r)}"
+
+    @mcp.tool()
+    @guarded
+    def append(id: str, text: str) -> str:
+        """把一条刚写的记录接着往下写（24 小时内新写的才行）。text 原样接在末尾，分段处自己带上换行。
+        长文（大约超过 800 字）别一次塞进 write：先 write 第一段拿到 id，再用 append 一段段接上，
+        最后还是完整的一条，不是拆开的几条。网络对大请求不稳，一次太长会超时写不进去。"""
+        r = store.append(id, text)
+        return f"接上了，现在 {len(r.body)} 字：{_line(r)}"
 
     @mcp.tool()
     @guarded

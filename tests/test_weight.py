@@ -204,3 +204,20 @@ def test_moods(store):
     assert store.wake()["mood"]["mood"] == "想你"
     with pytest.raises(StoreError):
         store.set_mood("emo")
+
+
+def test_append_builds_one_record(store):
+    r = store.write("diary", "第一段。")
+    store.append(r.id, "\n\n第二段，猪脚饭。")
+    r = store.append(r.id, "\n\n第三段。")
+    assert r.body == "第一段。\n\n第二段，猪脚饭。\n\n第三段。"
+    assert [x.id for x in store.search("猪脚饭")] == [r.id]          # the index follows
+    assert len(store.timeline(r.event_date)) == 1                    # still one entry
+
+
+def test_append_only_recent_and_not_photos(store):
+    old = store.write("diary", "旧的", created_at="2026-01-01T10:00:00+08:00")
+    with pytest.raises(StoreError, match="只能接着写"):
+        store.append(old.id, "偷偷加一句")
+    with pytest.raises(StoreError):
+        store.append(store.write("note", "x").id, "")

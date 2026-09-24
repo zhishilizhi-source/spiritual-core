@@ -436,6 +436,30 @@ class Store:
         records.sort(key=lambda r: scores[r.id][0], reverse=True)
         return records[:n]
 
+    APPEND_WINDOW_HOURS = 24
+
+    def append(self, rid: str, text: str) -> Record:
+        """Continue a record written moments ago, so a long entry can arrive in pieces and
+        still be one entry. Text is joined exactly as given. Only recent records, so an old
+        memory can't be quietly added to."""
+        rec = self.get(rid)
+        text = (text or "").replace("\r\n", "\n")
+        if not text:
+            raise StoreError("text 不能为空")
+        written = datetime.fromisoformat(rec.created_at)
+        if written.tzinfo is None:
+            written = written.replace(tzinfo=self.tz)
+        if self.now() - written > timedelta(hours=self.APPEND_WINDOW_HOURS):
+            raise StoreError(f"{rid} 是 {rec.created_at[:10]} 写的，只能接着写 {self.APPEND_WINDOW_HOURS} 小时内新写的记录")
+        if rec.kind == "image":
+            raise StoreError("照片的说明不能这样接")
+        with self.db:
+            self.db.execute(
+                "UPDATE records SET body = body || ?, updated_at=? WHERE id=?",
+                (text, self.now().isoformat(timespec="seconds"), rid),
+            )
+        return self.get(rid)
+
     def set_locked(self, rid: str, locked: bool) -> Record:
         rec = self.get(rid)
         if rec.kind not in LOCKABLE:
