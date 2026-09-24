@@ -41,8 +41,13 @@ def mount(mcp, store: Store, secret: str) -> None:
     async def to_slash(request: Request):
         return RedirectResponse(p + "/")
 
-    @mcp.custom_route(p + "/", methods=["GET"])
+    @mcp.custom_route(p + "/", methods=["GET", "POST"])
     async def index(request: Request):
+        if request.method == "POST":
+            # An MCP client pointed at the page address instead of the endpoint: say so plainly.
+            return JSONResponse(
+                {"error": f"这是网页地址。MCP 连接地址要以 /mcp 结尾：{request.url.scheme}://{request.url.netloc}{p}/mcp"},
+                status_code=404)
         return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
     @mcp.custom_route(p + "/api/image", methods=["POST"])

@@ -120,3 +120,10 @@ def test_group_caption_edit_and_inner_refused(env):
     inner = store.write("inner", "他的心里话")
     assert client.post(f"/k/api/edit/{inner.id}", json={"body": "改掉"}).status_code == 400
     assert store.get(inner.id).body == "他的心里话"
+
+
+def test_mcp_client_at_page_address_gets_a_clear_hint(env):
+    store, client = env
+    r = client.post("/k/", json={"jsonrpc": "2.0", "method": "initialize", "id": 1})
+    assert r.status_code == 404 and "/k/mcp" in r.json()["error"]
+    assert client.get("/k/").status_code == 200
