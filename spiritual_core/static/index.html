@@ -246,6 +246,17 @@
   .layer { border: 0; border-radius: 999px; padding: 0 7px; background: color-mix(in oklch, var(--glass) 26%, transparent);
            color: var(--muted); }
   .rec.sealed { border-style: dashed; border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .raw { display: grid; gap: 10px; font-size: 15px; }
+  .raw .win { text-align: center; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+  .turn { padding: 8px 12px 10px; border-radius: 14px; max-width: 92%; }
+  .turn.her { justify-self: end; background: color-mix(in oklch, var(--glass) 24%, transparent); }
+  .turn.me { justify-self: start; background: color-mix(in oklch, var(--card) 70%, transparent);
+             border: 1px solid var(--field-line); }
+  .turn.think { opacity: .75; font-size: 14px; border-style: dashed; }
+  .turn-h { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 2px; }
+  .turn.me .turn-h { color: var(--muted); }
+  .turn-h span { font-weight: 400; color: var(--muted); margin-left: 6px; }
+  .turn-b { white-space: pre-wrap; word-break: break-word; line-height: 1.65; }
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
   .gallery img, .rec .full .gallery img { width: 100%; aspect-ratio: 1; height: auto; object-fit: cover;
                                           border-radius: 10px; margin: 0; }
@@ -756,6 +767,28 @@
 
   const when = (s) => esc((s || "").replace("T", " ").slice(5, 16));
 
+  // Transcripts are stored as plain text, one turn per block under an "HH:MM 名字" line.
+  // Here those lines become small headers, hers and his in different colors.
+  const TURN = /^(\d\d:\d\d) (\S+)$/, WINDOW = /^—— 「(.*)」 ——$/;
+  function rawHtml(text) {
+    let html = "", open = false;
+    const close = () => { if (open) { html = html.replace(/\n+$/, "") + "</div></div>"; open = false; } };
+    for (const line of text.split("\n")) {
+      const t = line.match(TURN), w = line.match(WINDOW);
+      if (w) { close(); html += `<div class="win">${esc(w[1])}</div>`; continue; }
+      if (t) {
+        close();
+        const who = t[2], me = who.startsWith("陆能"), think = who.includes("思考");
+        html += `<div class="turn ${me ? "me" : "her"}${think ? " think" : ""}"><div class="turn-h">${esc(who)}<span>${t[1]}</span></div><div class="turn-b">`;
+        open = true; continue;
+      }
+      if (!open && !line.trim()) continue;
+      html += open ? esc(line) + "\n" : `<div class="body">${esc(line)}</div>`;
+    }
+    close();
+    return `<div class="raw">${html}</div>`;
+  }
+
   function recHtml(it) {
     if (it.sealed) {
       return `<div class="rec sealed"><div class="sealed-row"><span class="kind">心里话</span>
@@ -773,7 +806,8 @@
       ? `<input type="checkbox" class="tick" data-id="${esc(it.id)}" ${it.status === "done" ? "checked" : ""} aria-label="做完了">` : "";
     return `<details class="rec"><summary><span class="kind">${esc(KIND_NAME[it.kind] || it.kind)}${who}</span>
       ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}</summary>
-      <div class="full">${img}${it.kind === "image" && it.body === "（没写说明）" ? "" : `<div class="body">${esc(it.body)}</div>`}
+      <div class="full">${img}${it.kind === "image" && it.body === "（没写说明）" ? ""
+        : it.kind === "raw" ? rawHtml(it.body) : `<div class="body">${esc(it.body)}</div>`}
       ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>

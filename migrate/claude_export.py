@@ -76,19 +76,40 @@ def render(conversations: list, human: str, ai: str, label: str = "") -> dict[st
 
     out = {}
     for day in sorted(set(days) | set(lost)):
-        lines, current = [], None
+        # One block per turn: a speaker's consecutive messages (within TURN_GAP) under a single
+        # "HH:MM 名字" line, blocks separated by a blank line. The page styles those header lines.
+        blocks, window_now, turn = [], None, None
         for t, window, speaker, kind, text in sorted(days.get(day, []), key=lambda x: x[0]):
-            if window != current:
-                current = window
-                lines.append(f"\n—— 窗口「{names[window]}」 ——")
             who = f"{speaker}（思考）" if kind == "thinking" else speaker
-            lines.append(f"[{t:%H:%M}] {who}：{text}")
+            text = _tidy(text)
+            if window != window_now:
+                window_now, turn = window, None
+                blocks.append(f"—— 「{names[window]}」 ——")
+            if turn and turn["who"] == who and t - turn["last"] <= TURN_GAP:
+                turn["lines"].append(text)
+                turn["last"] = t
+                continue
+            turn = {"who": who, "first": t, "last": t, "lines": [text]}
+            blocks.append(turn)
+        parts = [b if isinstance(b, str) else f"{b['first']:%H:%M} {b['who']}\n" + "\n".join(b["lines"])
+                 for b in blocks]
         if lost.get(day):
             gone = "、".join(f"「{names[w]}」{n} 条" for w, n in lost[day].items())
-            lines.append(f"\n（这天还有 {gone}，导出里只剩时间，原文已经不在了。）")
+            parts.append(f"（这天还有 {gone}，导出里只剩时间，原文已经不在了。）")
         title = f"{day} 对话原文{label}" + ("" if days.get(day) else "（只剩时间）")
-        out[day] = (title, "\n".join(lines).strip())
+        out[day] = (title, "\n\n".join(parts).strip())
     return out
+
+
+TURN_GAP = timedelta(minutes=10)
+_BLANKS = re.compile(r"\n[ \t]*\n(?:[ \t]*\n)+")
+
+
+def _tidy(text: str) -> str:
+    """Trim each message and fold runs of blank lines into one; the words stay as they are."""
+    text = text.replace("\r\n", "\n").strip()
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
+    return _BLANKS.sub("\n\n", text)
 
 
 def main() -> None:
