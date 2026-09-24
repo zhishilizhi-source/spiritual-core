@@ -292,6 +292,31 @@
   .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
   .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+  /* ---- 今天: the top of the page is his side. */
+  #today { display: grid; gap: 12px; margin-bottom: 8px; }
+  #today:empty { display: none; }
+  .count { display: flex; gap: 22px; padding: 2px 4px 4px; }
+  .count div { color: var(--on-sky); font-size: 13px; }
+  .count b { display: block; font-size: 30px; line-height: 1.15; font-weight: 600; color: var(--ink);
+             letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .count b small { font-size: 14px; font-weight: 400; margin-left: 2px; color: var(--muted); }
+  .eyebrow { font-size: 12px; color: var(--accent); letter-spacing: .06em; margin-bottom: 6px; }
+  .eyebrow span { color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+  .today-diary h3 { font-size: 18px; font-weight: 600; margin: 0 0 8px; line-height: 1.4; }
+  .clamp { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.75;
+           overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines, 6); }
+  .clamp.open { display: block; }
+  .unfold { border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px;
+            padding: 8px 0 0; cursor: pointer; }
+  .mine-item { padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .mine-item:first-of-type { border-top: 0; padding-top: 2px; }
+  .mine-item .clamp { --lines: 4; }
+  .mine-item .her { font-size: 13px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; }
+  .mine-item .meta { margin-top: 6px; }
+  .sealed-note { font-size: 13px; color: var(--muted); padding-top: 10px; border-top: 1px dashed var(--line); }
+  .month .t { font-weight: 600; margin-bottom: 4px; }
+  .month .clamp { --lines: 3; color: var(--muted); font-size: 14px; }
+  h2.put { margin: 22px 0 10px; }
   /* ---- 极简: the first version's paper and ink. No painting, no lights, no stars, no glass. */
   :root[data-theme="plain"] {
     --bg: #f6f3ee; --card: #fffdf9; --ink: #2b2622; --muted: #7a7068; --on-sky: #7a7068;
@@ -332,6 +357,9 @@
     <div class="chips" id="moodChips"></div>
   </section>
 
+  <section id="today" aria-label="今天"></section>
+
+  <h2 class="put">往库里放</h2>
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
     <button role="tab" aria-selected="false" data-tab="words">存原话</button>
@@ -1050,6 +1078,54 @@
         body: JSON.stringify({ words, why: $("#why").value, event_date: $("#wordsDate").value }) }),
       () => $("#words").reset());
   });
+
+  // --- 今天 ---
+  const md = (s) => { const [, m, d] = s.split("-"); return `${+m}月${+d}日`; };
+  function renderToday(v) {
+    const parts = [];
+    if (v.days.length) parts.push(`<div class="count">${v.days.map((a) =>
+      `<div><b>${a.days}<small>天</small></b>${a.ahead ? `之后${esc(a.name)}` : esc(a.name)}</div>`).join("")}</div>`);
+    if (v.diary) {
+      const d = v.diary; ITEMS.set(d.id, d);
+      parts.push(`<article class="card today-diary"><div class="eyebrow">陆能的日记<span>${md(d.event_date)}</span></div>
+        <h3>${esc(d.title)}</h3><div class="clamp" data-id="${esc(d.id)}">${esc(d.body)}</div>
+        <button type="button" class="unfold">展开全文</button></article>`);
+    }
+    if (v.mine.length || v.locked) {
+      const items = v.mine.map((it) => {
+        ITEMS.set(it.id, it);
+        const mine = it.kind === "excerpt" ? it.why || it.body : it.body;
+        const her = it.kind === "excerpt" && it.why ? `<div class="her">${esc(it.body)}</div>` : "";
+        const label = it.kind === "inner" ? "心里话" : it.kind === "letter" ? "信" : "我留下的一句";
+        return `<div class="mine-item"><div class="clamp" data-id="${esc(it.id)}">${esc(mine)}</div>${her}
+          <div class="meta">${label} · ${when(it.created_at)}</div></div>`;
+      }).join("");
+      const sealed = v.locked ? `<div class="sealed-note">还有 ${v.locked} 条心里话锁着。想给你看的时候我自己打开。</div>` : "";
+      parts.push(`<section class="card"><div class="eyebrow">我留下的</div>${items}${sealed}</section>`);
+    }
+    if (v.month_ago) {
+      const m = v.month_ago; ITEMS.set(m.id, m);
+      parts.push(`<section class="card month"><div class="eyebrow">一个月前的今天<span>${md(v.month_ago_date)}</span></div>
+        <div class="mine-item"><div class="t">${esc(m.title)}</div><div class="clamp" data-id="${esc(m.id)}">${esc(m.body)}</div></div></section>`);
+    }
+    $("#today").innerHTML = parts.join("");
+    // no 展开 button when the text already fits
+    requestAnimationFrame(() => document.querySelectorAll("#today .unfold").forEach((b) => {
+      const c = b.previousElementSibling; if (c.scrollHeight <= c.clientHeight + 2) b.hidden = true; }));
+  }
+  $("#today").addEventListener("click", (ev) => {
+    if (ev.target.closest("a, button:not(.unfold)")) return;
+    const host = ev.target.closest(".today-diary, .mine-item"); if (!host) return;
+    const c = host.querySelector(".clamp"), open = !c.classList.contains("open");
+    c.classList.toggle("open", open);
+    const b = host.querySelector(".unfold"); if (b) b.textContent = open ? "收起" : "展开全文";
+    if (open && !c.dataset.seen) { c.dataset.seen = "1"; fetch("api/seen/" + c.dataset.id, { method: "POST" }).catch(() => {}); }
+    if (!open && host.getBoundingClientRect().top < 0) host.scrollIntoView({ block: "start" });
+  });
+  async function loadToday() {
+    try { renderToday(await (await fetch("api/today")).json()); } catch {}
+  }
+  loadToday();
 
   async function loadRecent() {
     try {

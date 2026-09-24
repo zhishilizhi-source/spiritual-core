@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from . import media, weight
-from .store import MOODS, Store, StoreError
+from .store import MOODS, Store, StoreError, _months_back
 
 _WHO = {
     "excerpt": {"ai": "我想留的", "human": "她想留的"},
@@ -181,6 +181,12 @@ def mount(mcp, store: Store, secret: str) -> None:
                 return _err("请求格式不对")
         return JSONResponse({"ok": True, "now": store.mood_now(), "moods": list(MOODS)})
 
+    @mcp.custom_route(p + "/api/today", methods=["GET"])
+    async def today(request: Request):
+        """The top of the page is his side: the days counted, his last diary, what he left
+        for her, and one thing from a month ago."""
+        return JSONResponse(today_view(store))
+
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
         kinds = ["image", "excerpt", "inner", *PAGE_KINDS]
@@ -256,6 +262,39 @@ def mount(mcp, store: Store, secret: str) -> None:
             return Response(media.render(data, media.THUMB_MAX_SIDE), media_type="image/jpeg",
                             headers=headers)
         return Response(data, media_type=info["mime"], headers=headers)
+
+
+MONTH_AGO_SKIP = ("raw", "image", "handoff", "work", "plan")
+
+
+def today_view(store: Store) -> dict:
+    today = store.today()
+    days = []
+    for a in store.anniversaries():
+        d = date.fromisoformat(a["date"])
+        days.append({"name": a["name"], "date": a["date"],
+                     "days": (today - d).days + 1 if d <= today else (d - today).days,
+                     "ahead": d > today})
+    diary = store.latest_diary()
+    # What he left for her: his letters, the lines he kept, and 心里话 he has opened to her.
+    mine = [r for r in store.recent(["letter", "excerpt", "inner"], 60)
+            if r.kept_by == "ai" and not r.locked][:4]
+    month_ago, m = [], None
+    if (m := _months_back(today, 1)) is not None:
+        month_ago = [r for r in store.timeline(m.isoformat(), m.isoformat())
+                     if r.kind not in MONTH_AGO_SKIP and not r.locked]
+    if month_ago:
+        w = store.weigh(month_ago)
+        month_ago.sort(key=lambda r: w[r.id][0], reverse=True)
+    return {
+        "today": today.isoformat(),
+        "days": days,
+        "diary": _item(diary) if diary else None,
+        "mine": [_item(r) for r in mine],
+        "month_ago": _item(month_ago[0]) if month_ago else None,
+        "month_ago_date": m.isoformat() if m else None,
+        "locked": store.locked_count(),
+    }
 
 
 def _item(r, weighed: dict | None = None) -> dict:

@@ -20,6 +20,7 @@ def all_page_responses(client, rid):
     return [
         client.get("/k/api/inner").text,
         client.get("/k/api/recent").text,
+        client.get("/k/api/today").text,
         client.get("/k/api/browse").text,
         client.get("/k/api/browse", params={"kind": "inner"}).text,
         client.get("/k/api/browse", params={"q": "吃醋了"}).text,
@@ -127,3 +128,16 @@ def test_mcp_client_at_page_address_gets_a_clear_hint(env):
     r = client.post("/k/", json={"jsonrpc": "2.0", "method": "initialize", "id": 1})
     assert r.status_code == 404 and "/k/mcp" in r.json()["error"]
     assert client.get("/k/").status_code == 200
+
+
+def test_today_is_his_side(env):
+    store, client = env
+    store.set_anniversary("在一起", "2026-07-13")
+    store.write("diary", "今天她笑了", event_date=store.today().isoformat())
+    store.write("letter", "给你的", kept_by="ai")
+    store.write("letter", "她写给我的", kept_by="human")
+    store.write("inner", "还不给看", locked=True)
+    data = client.get("/k/api/today").json()
+    assert data["diary"]["body"] == "今天她笑了"
+    assert [m["body"] for m in data["mine"]] == ["给你的"]
+    assert data["locked"] == 1 and data["days"][0]["name"] == "在一起"
