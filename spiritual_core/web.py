@@ -120,6 +120,8 @@ def mount(mcp, store: Store, secret: str) -> None:
         """Her score. Final; 0 hands it back to mine."""
         try:
             body = await request.json()
+            if store.get(request.path_params["rid"]).locked:
+                return _err("锁着的打不了分")
             rec = store.rate(request.path_params["rid"], body.get("value", 0), by="human")
         except StoreError as e:
             return _err(str(e))
@@ -131,7 +133,8 @@ def mount(mcp, store: Store, secret: str) -> None:
     async def seen(request: Request):
         rid = request.path_params["rid"]
         try:
-            store.get(rid)
+            if store.get(rid).locked:
+                return JSONResponse({"ok": True})
         except StoreError:
             return Response(status_code=404)
         store.touch(rid)
@@ -151,8 +154,13 @@ def mount(mcp, store: Store, secret: str) -> None:
 
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
-        kinds = ["image", "excerpt", *PAGE_KINDS]
+        kinds = ["image", "excerpt", "inner", *PAGE_KINDS]
         return JSONResponse({"items": [_item(r) for r in store.recent(kinds, 30)]})
+
+    @mcp.custom_route(p + "/api/inner", methods=["GET"])
+    async def inner(request: Request):
+        """His 心里话 shelf: newest first; locked ones arrive sealed."""
+        return JSONResponse({"items": [_item(r) for r in store.recent(["inner"], 50)]})
 
     @mcp.custom_route(p + "/api/browse", methods=["GET"])
     async def browse(request: Request):
@@ -161,7 +169,8 @@ def mount(mcp, store: Store, secret: str) -> None:
         kinds = [k for k in q.get("kind", "").split(",") if k] or None
         try:
             if q.get("q", "").strip():
-                records = store.search(q["q"], kinds, limit=100)
+                # A hit on a locked record would leak its words, so they are never searched here.
+                records = [r for r in store.search(q["q"], kinds, limit=100) if not r.locked]
                 w = store.weigh(records)
                 return JSONResponse({"items": [_item(r, w) for r in records]})
             end = q.get("end") or store.today().isoformat()
@@ -199,11 +208,20 @@ def mount(mcp, store: Store, secret: str) -> None:
 
 
 def _item(r, weighed: dict | None = None) -> dict:
+    """The only way a record leaves toward the page. A locked one leaves as a sealed shell."""
+    if r.locked:
+        return {
+            "id": r.id, "kind": r.kind, "event_date": r.event_date,
+            "created_at": r.created_at, "sealed": True,
+            "title": "上了锁的心里话", "body": "", "why": "", "status": "", "kept_by": "",
+            "weight": 0, "hers": 0, "reads": 0,
+        }
     item = {
         "id": r.id, "kind": r.kind, "event_date": r.event_date, "created_at": r.created_at,
         "title": r.title, "body": r.body, "why": r.why, "status": r.status,
         "kept_by": who_label(r),
         "weight": weight.effective(r), "hers": r.human_rating, "reads": r.read_count,
+        "unlocked_at": r.unlocked_at,
     }
     if weighed and r.id in weighed:
         item["score"], item["layer"] = weighed[r.id]

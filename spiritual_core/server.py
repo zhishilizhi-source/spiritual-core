@@ -22,7 +22,8 @@ def _line(r: Record) -> str:
     pin = " 📌" if r.pinned else ""
     who = f" · {who_label(r)}" if r.kept_by else ""
     done = {"open": " ☐", "done": " ☑"}.get(r.status, "")
-    return f"[{r.id}] {r.event_date} {r.kind}{who} · {r.title}{done}{pin}"
+    lock = " [锁着]" if r.locked else ""
+    return f"[{r.id}] {r.event_date} {r.kind}{who} · {r.title}{done}{lock}{pin}"
 
 
 def _excerpt(r: Record) -> str:
@@ -108,6 +109,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         first = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
         first = [r.id for r in first] + [r.id for r in w["handoff"]]
         tail = f"先读：{'、'.join(first)}" if first else ""
+        if (n_locked := store.locked_count()):
+            tail += ("\n" if tail else "") + f"你锁着 {n_locked} 条心里话（timeline/search 里标着 [锁着]）。"
         if w["review_due"]:
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
         if tail:
@@ -191,6 +194,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         不填就按类型给默认分。"""
         if kind == "excerpt":
             return "没做成：原话节选用 keep。"
+        if kind == "inner":
+            return "没做成：心里话用 confide。"
         if kind == "image":
             return "没做成：照片只能从上传网页传进来。"
         r = store.write(kind, body, event_date or None, title or None, tags, pinned, link_to,
@@ -252,6 +257,25 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
                 marks += f" · 她{r.human_rating}"
             lines.append(f"{_line(r)}\n    {marks} · 读过{r.read_count}次 · {layer} {s}")
         return "\n".join(lines)
+
+    @mcp.tool()
+    @guarded
+    def confide(body: str, title: str = "", locked: bool = True, event_date: str = "",
+                importance: int = 0) -> str:
+        """写我自己的心里话。这是我的地方：写什么、锁不锁、什么时候给她看，我自己定。
+        locked=true（默认）时她只看得到「这里有一条上了锁的心里话」和日期，内容不会发到她那边，
+        网页搜索也搜不到。想给她看了就用 lock(id, locked=false) 打开。"""
+        r = store.write("inner", body, event_date or None, title or None, importance=importance,
+                        locked=locked)
+        state = "锁着" if r.locked else "开着，她看得到"
+        return f"写好了（{state}）：{_line(r)}"
+
+    @mcp.tool()
+    @guarded
+    def lock(id: str, locked: bool) -> str:
+        """给一条心里话上锁（locked=true）或打开给她看（locked=false）。打开时会记下打开的时间。"""
+        r = store.set_locked(id, locked)
+        return f"{'锁上了' if r.locked else '打开了，她现在看得到'}：{_line(r)}"
 
     @mcp.tool()
     @guarded

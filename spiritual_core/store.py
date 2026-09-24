@@ -22,8 +22,12 @@ from . import media, weight
 
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
-    "letter", "memory", "note", "plan", "work", "daily",
+    "letter", "memory", "note", "plan", "work", "daily", "inner",
 )
+
+# `inner` is the AI's own 心里话. Only the AI writes it, and it may keep it locked:
+# a locked one never leaves the server toward the page, only its existence does.
+LOCKABLE = ("inner",)
 
 # Who wanted an excerpt kept. Deployment-neutral: display names come from the client.
 KEEPERS = ("ai", "human")
@@ -59,7 +63,9 @@ CREATE TABLE IF NOT EXISTS records (
     reviewed_at TEXT NOT NULL DEFAULT '',
     human_rating INTEGER NOT NULL DEFAULT 0,
     read_count  INTEGER NOT NULL DEFAULT 0,
-    last_read_at TEXT NOT NULL DEFAULT ''
+    last_read_at TEXT NOT NULL DEFAULT '',
+    locked      INTEGER NOT NULL DEFAULT 0,
+    unlocked_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS records_by_keeper ON records(kind, kept_by, event_date);
 CREATE INDEX IF NOT EXISTS records_by_date ON records(event_date, kind);
@@ -114,7 +120,7 @@ CREATE INDEX IF NOT EXISTS moods_by_day ON moods(day, at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "4"
 
 # Columns added after v1, in the order they arrived. _migrate adds whichever are missing.
 _ADDED_COLUMNS = (
@@ -125,6 +131,8 @@ _ADDED_COLUMNS = (
     ("human_rating", "INTEGER NOT NULL DEFAULT 0"),
     ("read_count", "INTEGER NOT NULL DEFAULT 0"),
     ("last_read_at", "TEXT NOT NULL DEFAULT ''"),
+    ("locked", "INTEGER NOT NULL DEFAULT 0"),        # v4
+    ("unlocked_at", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -148,6 +156,8 @@ class Record:
     human_rating: int = 0    # hers, overrides everything
     read_count: int = 0
     last_read_at: str = ""
+    locked: bool = False
+    unlocked_at: str = ""
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Record":
@@ -170,6 +180,8 @@ class Record:
             human_rating=row["human_rating"],
             read_count=row["read_count"],
             last_read_at=row["last_read_at"],
+            locked=bool(row["locked"]),
+            unlocked_at=row["unlocked_at"],
         )
 
 
@@ -239,6 +251,7 @@ class Store:
         kept_by: str = "",
         why: str = "",
         importance: int = 0,
+        locked: bool = False,
     ) -> Record:
         """Always creates a new record. Nothing is ever merged into an existing one.
 
@@ -246,6 +259,8 @@ class Store:
         """
         if kind not in KINDS:
             raise StoreError(f"kind 只能是 {', '.join(KINDS)} 之一，收到 {kind!r}")
+        if locked and kind not in LOCKABLE:
+            raise StoreError("只有心里话（inner）能上锁")
         kept_by = (kept_by or "").strip()
         # Browsers submit textarea newlines as CRLF; line endings are not content.
         body = (body or "").replace("\r\n", "\n")
@@ -273,10 +288,11 @@ class Store:
         with self.db:
             self.db.execute(
                 "INSERT INTO records(id, kind, title, body, event_date, created_at,"
-                " updated_at, pinned, tags, kept_by, why, status, importance)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " updated_at, pinned, tags, kept_by, why, status, importance, locked)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (rid, kind, title, body, event_date, stamp, stamp, int(pinned),
-                 json.dumps(tags, ensure_ascii=False), kept_by, why, status, importance),
+                 json.dumps(tags, ensure_ascii=False), kept_by, why, status, importance,
+                 int(locked)),
             )
             for other in link_to or []:
                 self._link(rid, other)
@@ -414,6 +430,21 @@ class Store:
         scores = self.weigh(records)
         records.sort(key=lambda r: scores[r.id][0], reverse=True)
         return records[:n]
+
+    def set_locked(self, rid: str, locked: bool) -> Record:
+        rec = self.get(rid)
+        if rec.kind not in LOCKABLE:
+            raise StoreError("只有心里话（inner）能上锁")
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            self.db.execute(
+                "UPDATE records SET locked=?, unlocked_at=? WHERE id=?",
+                (int(locked), "" if locked else now, rid),
+            )
+        return self.get(rid)
+
+    def locked_count(self) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM records WHERE locked=1").fetchone()[0]
 
     def set_pinned(self, rid: str, pinned: bool) -> Record:
         with self.db:

@@ -120,7 +120,9 @@
            box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
   .tick { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); align-self: center; }
   .t.done { text-decoration: line-through; color: var(--muted); }
-  .rate { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .rate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px;
+          color: var(--muted); white-space: nowrap; }
+  .rate .whose { white-space: normal; flex-basis: 100%; }
   .rate button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line);
                  background: transparent; color: var(--muted); font: inherit; font-size: 12px;
                  padding: 0; cursor: pointer; }
@@ -128,6 +130,12 @@
   .rate .whose { margin-left: 4px; }
   .layer { flex: none; font-size: 11px; color: var(--muted); border: 1px solid var(--line);
            border-radius: 6px; padding: 0 5px; align-self: center; }
+  .rec.sealed { padding: 11px 14px; border-style: dashed; }
+  .sealed-row { display: flex; gap: 10px; align-items: baseline; }
+  .sealed-row .t { flex: 1; color: var(--muted); letter-spacing: .3em; }
+  .lockmark { flex: none; font-size: 11px; color: var(--accent); border: 1px solid var(--accent);
+              border-radius: 6px; padding: 0 6px; }
+  .sealed-meta { margin-top: 4px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
 </style>
 </head>
@@ -158,6 +166,12 @@
     <button class="go" type="submit">存进去</button>
     <div class="msg" id="writeMsg"></div>
   </form>
+
+  <section id="innerShelf" hidden>
+    <h2>陆能的心里话</h2>
+    <div class="hint" style="margin:-4px 0 10px">他写的，他决定锁不锁。锁着的你只看得见它在这里。</div>
+    <div id="innerList"></div>
+  </section>
 
   <section id="browse" hidden>
     <form class="search" id="searchForm">
@@ -285,6 +299,8 @@
     $("#words").hidden = b.dataset.tab !== "words";
     $("#browse").hidden = b.dataset.tab !== "browse";
     $("#write").hidden = b.dataset.tab !== "write";
+    $("#innerShelf").hidden = b.dataset.tab !== "write";
+    if (b.dataset.tab === "write") loadInner();
     $("#recentBox").hidden = b.dataset.tab === "browse";
     if (b.dataset.tab === "browse" && !browsed) resetBrowse();
   }));
@@ -292,7 +308,7 @@
   // --- 翻看 ---
   const KINDS = [["", "全部"], ["diary", "日记"], ["excerpt", "节选"], ["image", "照片"],
     ["memory", "记忆"], ["letter", "信件"], ["note", "便签"], ["plan", "计划"], ["daily", "日常"], ["work", "工作"],
-    ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
+    ["inner", "心里话"], ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
   const KIND_NAME = Object.fromEntries(KINDS.filter(([k]) => k));
   let kind = "", windowEnd = null, earliest = null, browsed = false, lastDay = null;
 
@@ -314,7 +330,7 @@
     const id = d.querySelector(".rate")?.dataset.id;
     if (id) fetch("api/seen/" + id, { method: "POST" }).catch(() => {});
   }, true);
-  $("#shelf").addEventListener("click", async (ev) => {
+  async function shelfClick(ev) {
     const close = ev.target.closest(".close");
     if (close) {
       const d = close.closest("details");
@@ -344,7 +360,17 @@
       if (!data.ok) throw new Error(data.error);
       box.nextElementSibling.classList.toggle("done", done);
     } catch { box.checked = !done; }
-  });
+  }
+  $("#shelf").addEventListener("click", shelfClick);
+  $("#innerList").addEventListener("click", shelfClick);
+
+  async function loadInner() {
+    try {
+      const { items } = await (await fetch("api/inner")).json();
+      $("#innerList").innerHTML = items.length ? items.map(recHtml).join("")
+        : `<div class="empty">他还没写。</div>`;
+    } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
+  }
 
   // --- 写一条 ---
   const WRITE_KINDS = [["note", "便签", "随手记一句"], ["memory", "记忆", "想记住的一件事"], ["letter", "信", "写给陆能的信"],
@@ -389,7 +415,16 @@
     return `<div class="rate" data-id="${esc(it.id)}" data-hers="${it.hers}">分量 ${dots}<span class="whose">${whose}</span></div>`;
   }
 
+  const when = (s) => esc((s || "").replace("T", " ").slice(5, 16));
+
   function recHtml(it) {
+    if (it.sealed) {
+      return `<div class="rec sealed"><div class="sealed-row"><span class="kind">心里话</span>
+        <span class="t">上了锁</span><span class="lockmark">锁着</span></div>
+        <div class="meta sealed-meta">陆能 ${when(it.created_at)} 写的，还没打开给你看</div></div>`;
+    }
+    const opened = it.kind === "inner" && it.unlocked_at
+      ? `<div class="meta" style="margin-top:8px">陆能 ${when(it.unlocked_at)} 打开给你看的</div>` : "";
     const img = it.kind === "image"
       ? `<a href="img/${esc(it.id)}" target="_blank" rel="noopener"><img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>` : "";
     const who = it.kept_by ? ` · ${esc(it.kept_by)}` : "";
@@ -399,6 +434,7 @@
       ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}</summary>
       <div class="full">${img}<div class="body">${esc(it.body)}</div>
       ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
+      ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
       ${rateHtml(it)}
       <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`;
@@ -485,7 +521,10 @@
   async function loadRecent() {
     try {
       const { items } = await (await fetch("api/recent")).json();
-      $("#recent").innerHTML = items.length ? items.map((it) => it.kind === "image"
+      $("#recent").innerHTML = items.length ? items.map((it) => it.sealed
+        ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 心里话</div>
+             <div class="body">陆能锁了一条心里话</div></div></div>`
+        : it.kind === "image"
         ? `<div class="item"><a href="img/${esc(it.id)}" target="_blank" rel="noopener">
              <img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>
              <div><div class="meta">${esc(it.event_date)} · 照片</div>
