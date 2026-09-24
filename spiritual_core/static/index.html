@@ -296,6 +296,8 @@
   .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
   .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+  .tabs { transform: translateZ(0); }
+  .tabs.repaint { transform: translateZ(0) scale(.9999); }
   /* night: the selected tab is the same mood color as every other pressed button */
   :root[data-scheme="dark"] .tabs button[aria-selected="true"] { background: var(--on-bg); color: var(--on-ink); box-shadow: none; }
   /* ---- 今天: the top of the page is his side, one line per thing until opened. */
@@ -815,6 +817,11 @@
     $("#recentBox").hidden = b.dataset.tab === "browse";
     $("#today").hidden = b.dataset.tab === "browse";
     if (b.dataset.tab === "browse" && !browsed) resetBrowse();
+    // iOS Safari keeps the blurred tab bar's old picture when it jumps (翻看 hides the top
+    // block), so the highlight seemed to land on another tab. Make it paint afresh.
+    const bar = $(".tabs");
+    bar.classList.add("repaint");
+    requestAnimationFrame(() => requestAnimationFrame(() => bar.classList.remove("repaint")));
   }));
 
   // --- 翻看 ---
