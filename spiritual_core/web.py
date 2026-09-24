@@ -187,6 +187,26 @@ def mount(mcp, store: Store, secret: str) -> None:
         for her, and one thing from a month ago."""
         return JSONResponse(today_view(store))
 
+    @mcp.custom_route(p + "/api/message/seen", methods=["POST"])
+    async def message_seen(request: Request):
+        try:
+            ids = [str(i) for i in (await request.json()).get("ids", [])][:50]
+        except (ValueError, AttributeError):
+            return _err("请求格式不对")
+        store.mark_seen(ids)
+        return JSONResponse({"ok": True})
+
+    @mcp.custom_route(p + "/api/message/{rid}/reply", methods=["POST"])
+    async def message_reply(request: Request):
+        try:
+            text = (await request.json()).get("text", "")
+            r = store.reply(request.path_params["rid"], text)
+        except StoreError as e:
+            return _err(str(e))
+        except (ValueError, AttributeError):
+            return _err("请求格式不对")
+        return JSONResponse({"ok": True, "item": _item(r)})
+
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
         kinds = ["image", "excerpt", "inner", *PAGE_KINDS]
@@ -276,9 +296,6 @@ def today_view(store: Store) -> dict:
                      "days": (today - d).days + 1 if d <= today else (d - today).days,
                      "ahead": d > today})
     diary = store.latest_diary()
-    # What he left for her: his letters, the lines he kept, and 心里话 he has opened to her.
-    mine = [r for r in store.recent(["letter", "excerpt", "inner"], 60)
-            if r.kept_by == "ai" and not r.locked][:4]
     month_ago, m = [], None
     if (m := _months_back(today, 1)) is not None:
         month_ago = [r for r in store.timeline(m.isoformat(), m.isoformat())
@@ -290,7 +307,7 @@ def today_view(store: Store) -> dict:
         "today": today.isoformat(),
         "days": days,
         "diary": _item(diary) if diary else None,
-        "mine": [_item(r) for r in mine],
+        "messages": [_item(r) for r in store.page_messages()],
         "month_ago": _item(month_ago[0]) if month_ago else None,
         "month_ago_date": m.isoformat() if m else None,
         "locked": store.locked_count(),
@@ -312,6 +329,7 @@ def _item(r, weighed: dict | None = None) -> dict:
         "kept_by": who_label(r),
         "weight": weight.effective(r), "hers": r.human_rating, "reads": r.read_count,
         "unlocked_at": r.unlocked_at, "batch": r.batch,
+        "seen_at": r.seen_at, "reply": r.reply, "replied_at": r.replied_at,
     }
     if weighed and r.id in weighed:
         item["score"], item["layer"] = weighed[r.id]

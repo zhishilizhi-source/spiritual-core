@@ -298,6 +298,19 @@
   .count { display: flex; gap: 18px; font-size: 13px; color: var(--on-sky); margin: 0 2px 10px; }
   .count b { font-size: 17px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
   .sealed-note { font-size: 12px; color: var(--muted); margin: 2px 4px 0; }
+  .note-item { padding: 12px 0; border-top: 1px solid var(--line); }
+  .note-item:first-child { border-top: 0; padding-top: 2px; }
+  .note-item .body { line-height: 1.75; }
+  .note-item .meta { margin-top: 4px; }
+  .reply-open { margin-top: 8px; border: 1px solid var(--field-line); background: var(--field); color: var(--accent);
+                font: inherit; font-size: 13px; border-radius: 999px; padding: 4px 14px; cursor: pointer; }
+  .reply-box { margin-top: 8px; }
+  .reply-box textarea { min-height: 72px; }
+  .edit-actions .r-send { background: var(--on-bg); color: var(--on-ink); border-color: transparent; font-weight: 600; }
+  .her-reply { margin-top: 8px; padding: 8px 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap;
+               background: color-mix(in oklch, var(--glass) 22%, transparent); }
+  .her-reply span { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
+  .layer.new { background: var(--on-bg); color: var(--on-ink); }
   h2.put { margin: 18px 0 10px; }
   /* ---- 极简: the first version's paper and ink. No painting, no lights, no stars, no glass. */
   :root[data-theme="plain"] {
@@ -746,7 +759,7 @@
   // --- 翻看 ---
   const KINDS = [["", "全部"], ["diary", "日记"], ["excerpt", "节选"], ["image", "照片"],
     ["memory", "记忆"], ["letter", "信件"], ["note", "便签"], ["plan", "计划"], ["daily", "日常"], ["work", "工作"],
-    ["inner", "心里话"], ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
+    ["inner", "心里话"], ["message", "留言"], ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
   const KIND_NAME = Object.fromEntries(KINDS.filter(([k]) => k));
   let kind = "", windowEnd = null, earliest = null, browsed = false, lastDay = null;
 
@@ -1063,15 +1076,51 @@
 
   // --- 今天 ---
   const md = (s) => { const [, m, d] = s.split("-"); return `${+m}月${+d}日`; };
+  // His messages: he speaks first, she answers whenever. One row holding all of them.
+  function msgItemHtml(m) {
+    return `<div class="note-item" data-id="${esc(m.id)}">
+      <div class="body">${esc(m.body)}</div>
+      <div class="meta">${when(m.created_at)}</div>
+      ${m.reply ? `<div class="her-reply"><span>你回</span>${esc(m.reply)}</div>`
+                : `<button type="button" class="reply-open">回复</button>
+      <div class="reply-box" hidden><textarea rows="3" placeholder="回他一句，写什么都行"></textarea>
+        <div class="edit-actions"><button type="button" class="r-cancel">算了</button><button type="button" class="r-send">发给他</button></div>
+        <div class="msg"></div></div>`}
+    </div>`;
+  }
+  function msgsHtml(list) {
+    const unseen = list.filter((m) => !m.seen_at).length;
+    return `<details class="rec msgs"><summary><span class="kind">陆能留言</span>
+      <span class="t">${esc(list[0].title)}</span>${unseen ? `<span class="layer new">${unseen} 条新的</span>` : ""}</summary>
+      <div class="full">${list.map(msgItemHtml).join("")}<div class="hint">你回过的，第二天收进便签。</div>
+      <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`;
+  }
+  $("#today").addEventListener("click", async (ev) => {
+    const item = ev.target.closest(".note-item"); if (!item) return;
+    const box = item.querySelector(".reply-box");
+    if (ev.target.closest(".reply-open")) {
+      ev.target.hidden = true; box.hidden = false; box.querySelector("textarea").focus(); return;
+    }
+    if (ev.target.closest(".r-cancel")) { box.hidden = true; item.querySelector(".reply-open").hidden = false; return; }
+    const send = ev.target.closest(".r-send"); if (!send) return;
+    const text = box.querySelector("textarea").value.trim();
+    if (!text) return;
+    send.disabled = true; box.querySelector(".msg").textContent = "发着……";
+    try {
+      const data = await (await fetch(`api/message/${item.dataset.id}/reply`, { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) })).json();
+      if (!data.ok) throw new Error(data.error);
+      item.outerHTML = msgItemHtml(data.item);
+    } catch (e) { box.querySelector(".msg").textContent = e.message || "没发出去"; send.disabled = false; }
+  });
+
   // Compact on purpose: one line each, opened on tap, so the forms below stay on the first screen.
   function renderToday(v) {
     const count = v.days.length ? `<div class="count">${v.days.map((a) =>
       `<span>${esc(a.name)}${a.ahead ? "还有" : ""} <b>${a.days}</b> 天</span>`).join("")}</div>` : "";
     const rows = [];
     if (v.diary) rows.push(recHtml(v.diary, `日记 · ${md(v.diary.event_date)}`));
-    for (const it of v.mine.slice(0, 2)) {
-      rows.push(recHtml(it, it.kind === "inner" ? "心里话" : it.kind === "letter" ? "我写的信" : "我留下的"));
-    }
+    if (v.messages.length) rows.unshift(msgsHtml(v.messages));
     if (v.month_ago) rows.push(recHtml(v.month_ago, `一个月前 · ${md(v.month_ago_date)}`));
     const sealed = v.locked ? `<div class="sealed-note">还有 ${v.locked} 条心里话锁着，想给你看的时候我自己打开。</div>` : "";
     $("#today").innerHTML = count + rows.join("") + sealed;
@@ -1081,6 +1130,13 @@
     const d = ev.target;
     if (!d.open || d.dataset.seen) return;
     d.dataset.seen = "1";
+    if (d.classList.contains("msgs")) {
+      const ids = [...d.querySelectorAll(".note-item")].map((x) => x.dataset.id);
+      fetch("api/message/seen", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }) }).catch(() => {});
+      d.querySelector(".layer.new")?.remove();
+      return;
+    }
     const id = d.querySelector(".rate")?.dataset.id;
     if (id) fetch("api/seen/" + id, { method: "POST" }).catch(() => {});
   }, true);

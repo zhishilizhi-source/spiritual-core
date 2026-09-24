@@ -134,10 +134,44 @@ def test_today_is_his_side(env):
     store, client = env
     store.set_anniversary("在一起", "2026-07-13")
     store.write("diary", "今天她笑了", event_date=store.today().isoformat())
-    store.write("letter", "给你的", kept_by="ai")
-    store.write("letter", "她写给我的", kept_by="human")
+    store.leave("想你了")
     store.write("inner", "还不给看", locked=True)
     data = client.get("/k/api/today").json()
     assert data["diary"]["body"] == "今天她笑了"
-    assert [m["body"] for m in data["mine"]] == ["给你的"]
+    assert [m["body"] for m in data["messages"]] == ["想你了"]
     assert data["locked"] == 1 and data["days"][0]["name"] == "在一起"
+
+
+def test_message_reply_then_filed_as_note_next_day(env, monkeypatch):
+    from datetime import timedelta
+    store, client = env
+    m = store.leave("今天想听你说话", title="想听你说话")
+    assert client.post("/k/api/message/seen", json={"ids": [m.id]}).json()["ok"]
+    r = client.post(f"/k/api/message/{m.id}/reply", json={"text": "那你来"}).json()
+    assert r["ok"] and r["item"]["reply"] == "那你来"
+    assert client.post(f"/k/api/message/{m.id}/reply", json={"text": "  "}).status_code == 400
+    # still on the page today
+    assert [x["id"] for x in client.get("/k/api/today").json()["messages"]] == [m.id]
+    real_now = store.now()
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=1))
+    assert client.get("/k/api/today").json()["messages"] == []
+    rec = store.get(m.id)
+    assert rec.kind == "note" and rec.body.startswith("今天想听你说话") and rec.body.endswith("那你来")
+    assert [x.id for x in store.answered()] == [m.id]
+
+
+def test_seen_messages_from_before_today_leave_the_page(env, monkeypatch):
+    from datetime import timedelta
+    store, client = env
+    old = store.leave("昨天的")
+    unread = store.leave("没看的")
+    store.mark_seen([old.id])
+    real_now = store.now()
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=1))
+    assert [x["id"] for x in client.get("/k/api/today").json()["messages"]] == [unread.id]
+
+
+def test_only_messages_take_replies(env):
+    store, client = env
+    n = store.write("note", "便签")
+    assert client.post(f"/k/api/message/{n.id}/reply", json={"text": "嗯"}).status_code == 400

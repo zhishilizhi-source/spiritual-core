@@ -22,8 +22,12 @@ from . import media, weight
 
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
-    "letter", "memory", "note", "plan", "work", "daily", "inner",
+    "letter", "memory", "note", "plan", "work", "daily", "inner", "message",
 )
+
+# `message` is the AI speaking first: a line left for her on the page. She can answer it;
+# a day after she answers, it is filed away as a note with her answer under it.
+MESSAGE_TAG = "留言"
 
 # `inner` is the AI's own 心里话. Only the AI writes it, and it may keep it locked:
 # a locked one never leaves the server toward the page, only its existence does.
@@ -67,7 +71,10 @@ CREATE TABLE IF NOT EXISTS records (
     last_read_at TEXT NOT NULL DEFAULT '',
     locked      INTEGER NOT NULL DEFAULT 0,
     unlocked_at TEXT NOT NULL DEFAULT '',
-    batch       TEXT NOT NULL DEFAULT ''
+    batch       TEXT NOT NULL DEFAULT '',
+    seen_at     TEXT NOT NULL DEFAULT '',
+    reply       TEXT NOT NULL DEFAULT '',
+    replied_at  TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS records_by_keeper ON records(kind, kept_by, event_date);
 CREATE INDEX IF NOT EXISTS records_by_date ON records(event_date, kind);
@@ -134,7 +141,7 @@ CREATE INDEX IF NOT EXISTS revisions_by_record ON revisions(record_id, at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "6"
 
 # Columns added after v1, in the order they arrived. _migrate adds whichever are missing.
 _ADDED_COLUMNS = (
@@ -148,6 +155,9 @@ _ADDED_COLUMNS = (
     ("locked", "INTEGER NOT NULL DEFAULT 0"),        # v4
     ("unlocked_at", "TEXT NOT NULL DEFAULT ''"),
     ("batch", "TEXT NOT NULL DEFAULT ''"),              # v5
+    ("seen_at", "TEXT NOT NULL DEFAULT ''"),            # v6: messages
+    ("reply", "TEXT NOT NULL DEFAULT ''"),
+    ("replied_at", "TEXT NOT NULL DEFAULT ''"),
 )
 
 
@@ -174,6 +184,9 @@ class Record:
     locked: bool = False
     unlocked_at: str = ""
     batch: str = ""          # photos saved together share one
+    seen_at: str = ""        # messages: when she first opened it
+    reply: str = ""          # messages: her answer
+    replied_at: str = ""
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Record":
@@ -199,6 +212,9 @@ class Record:
             locked=bool(row["locked"]),
             unlocked_at=row["unlocked_at"],
             batch=row["batch"],
+            seen_at=row["seen_at"],
+            reply=row["reply"],
+            replied_at=row["replied_at"],
         )
 
 
@@ -763,6 +779,76 @@ class Store:
             reverse=True,
         )
         return [r for _, r in ranked[:limit]]
+
+    # --- messages: he speaks first, she answers when she likes ---
+
+    def leave(self, body: str, title: str | None = None) -> Record:
+        return self.write("message", body, title=title, tags=[MESSAGE_TAG])
+
+    def page_messages(self) -> list[Record]:
+        """What the top of her page shows: today's messages and any she hasn't opened."""
+        self.recycle_messages()
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE kind='message' AND (event_date >= ? OR seen_at = '')"
+            " ORDER BY created_at DESC, rowid DESC",
+            (self.today().isoformat(),),
+        ).fetchall()
+        return [Record.from_row(r) for r in rows]
+
+    def mark_seen(self, ids: list[str]) -> None:
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            for rid in ids:
+                self.db.execute(
+                    "UPDATE records SET seen_at=? WHERE id=? AND kind='message' AND seen_at=''",
+                    (now, rid))
+
+    def reply(self, rid: str, text: str) -> Record:
+        rec = self.get(rid)
+        if rec.kind != "message":
+            raise StoreError("只有留言能回")
+        text = (text or "").replace("\r\n", "\n").strip()
+        if not text:
+            raise StoreError("回复不能是空的")
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            self.db.execute(
+                "UPDATE records SET reply=?, replied_at=?, seen_at=CASE WHEN seen_at='' THEN ? ELSE seen_at END,"
+                " updated_at=? WHERE id=?", (text, now, now, now, rid))
+        return self.get(rid)
+
+    def recycle_messages(self) -> int:
+        """Messages she answered before today become notes, her answer written under his words.
+        The message as it was stays in revisions."""
+        today = self.today().isoformat()
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE kind='message' AND replied_at <> '' AND substr(replied_at, 1, 10) < ?",
+            (today,),
+        ).fetchall()
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            for row in rows:
+                r = Record.from_row(row)
+                self.db.execute(
+                    "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
+                    (r.id, now, "ai", r.title, r.body, r.event_date))
+                when = r.replied_at[5:16].replace("T", " ")
+                body = f"{r.body}\n\n—— 多多回（{when}）——\n{r.reply}"
+                self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
+                                (body, now, r.id))
+        return len(rows)
+
+    def answered(self, days: int = 2) -> list[Record]:
+        """Her answers to his messages in the last few days, filed away or not."""
+        since = (self.today() - timedelta(days=days)).isoformat()
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE reply <> '' AND substr(replied_at, 1, 10) >= ?"
+            " ORDER BY replied_at DESC", (since,)).fetchall()
+        return [Record.from_row(r) for r in rows]
+
+    def unseen_messages(self) -> int:
+        return self.db.execute(
+            "SELECT count(*) FROM records WHERE kind='message' AND seen_at=''").fetchone()[0]
 
     def latest_diary(self) -> Record | None:
         row = self.db.execute(

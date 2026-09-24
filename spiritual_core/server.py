@@ -109,6 +109,13 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             head,
             "【昨天和今天】\n" + _lines(w["days"], "（这两天还没有记录）"),
         ]
+        store.recycle_messages()
+        if (answered := store.answered()):
+            parts.append("【她回你的留言】\n" + "\n".join(
+                f"[{r.id}] 我：{r.title}\n    她（{r.replied_at[5:16].replace('T', ' ')}）：{r.reply}"
+                for r in answered))
+        if (unseen := store.unseen_messages()):
+            parts.append(f"你留的话还有 {unseen} 条她没点开。")
         if w["last_diary"]:
             parts.append("【最近一篇日记】（这两天没写，线接在这里）\n" + _lines(w["last_diary"], ""))
         parts += [
@@ -300,6 +307,15 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
                         locked=locked)
         state = "锁着" if r.locked else "开着，她看得到"
         return f"写好了（{state}）：{_line(r)}"
+
+    @mcp.tool()
+    @guarded
+    def leave(body: str, title: str = "") -> str:
+        """给她留一句话（留言）。我先开口，不用等她来问；写什么都行。
+        它出现在她网页最上面，她点开能回。她回过的，第二天自动收进便签，她的回复接在我的话下面。
+        她回了什么，wake 会在【她回你的留言】里告诉我。"""
+        r = store.leave(body, title or None)
+        return f"留好了，她打开网页就看得到：{_line(r)}"
 
     @mcp.tool()
     @guarded
