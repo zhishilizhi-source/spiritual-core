@@ -10,30 +10,38 @@
 <link rel="manifest" href="static/manifest.json?v=2">
 <meta name="apple-mobile-web-app-title" content="Spiritual Core">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171513" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7e2d8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#2e2743" media="(prefers-color-scheme: dark)">
 <style>
+  /* Dusk sinking into night, same sky as the icon. */
   :root {
-    --bg: #f6f3ee; --card: #fffdf9; --ink: #2b2622; --muted: #8a8078;
-    --line: #e6dfd5; --accent: #9b5d4b; --accent-ink: #fff; --ok: #4f7a5a; --bad: #b0453a;
+    --sky-top: #f7e2d8; --sky-bottom: #ebe4f1;
+    --bg: #f4ebee; --card: #fffaf7; --ink: #3a3350; --muted: #685e79;
+    --line: #e7dce3; --accent: #a5573f; --accent-ink: #fff; --ok: #4f7a5a; --bad: #b0453a;
     --radius: 14px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #171513; --card: #211e1b; --ink: #ece6de; --muted: #9a9087;
-      --line: #34302b; --accent: #d08a72; --accent-ink: #1a1512; --ok: #86b592; --bad: #e0776b;
+      --sky-top: #2e2743; --sky-bottom: #1b1829;
+      --bg: #221e33; --card: #2d2842; --ink: #f1e9e2; --muted: #a8a0b9;
+      --line: #3e3757; --accent: #eb9d83; --accent-ink: #2a2440; --ok: #8cc39a; --bad: #ec8577;
       color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  html { background: var(--bg); }
+  html, body { margin: 0; color: var(--ink); }
+  html::before { content: ""; position: fixed; inset: 0; z-index: -1;
+                 background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom)); }
   body {
     font: 16px/1.6 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
     max-width: 560px; margin: 0 auto;
   }
-  h1 { font-size: 20px; font-weight: 600; letter-spacing: .02em; margin: 4px 0 16px; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: .02em; margin: 4px 0 16px;
+       display: flex; align-items: center; gap: 12px; }
+  h1 img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
   h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
   .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--line);
           padding: 4px; border-radius: 12px; margin-bottom: 14px; }
@@ -112,7 +120,7 @@
 </style>
 </head>
 <body>
-  <h1>Spiritual Core<small>陆能和多多的记忆库</small></h1>
+  <h1><img src="static/favicon.png?v=2" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span></h1>
 
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
