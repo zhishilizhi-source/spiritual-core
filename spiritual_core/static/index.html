@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Spiritual Core</title>
+<style>
+  :root {
+    --bg: #f6f3ee; --card: #fffdf9; --ink: #2b2622; --muted: #8a8078;
+    --line: #e6dfd5; --accent: #9b5d4b; --accent-ink: #fff; --ok: #4f7a5a; --bad: #b0453a;
+    --radius: 14px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171513; --card: #211e1b; --ink: #ece6de; --muted: #9a9087;
+      --line: #34302b; --accent: #d08a72; --accent-ink: #1a1512; --ok: #86b592; --bad: #e0776b;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 16px/1.6 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    max-width: 560px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: .02em; margin: 4px 0 16px; }
+  h1 small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--line);
+          padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+  .tabs button { border: 0; background: transparent; color: var(--muted); font: inherit;
+                 padding: 9px 0; border-radius: 9px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--card); color: var(--ink); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 16px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  textarea, input[type=date] {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  textarea.words { min-height: 160px; }
+  .pick { display: grid; place-items: center; min-height: 150px; border: 1.5px dashed var(--line);
+          border-radius: 12px; color: var(--muted); cursor: pointer; text-align: center;
+          overflow: hidden; background: var(--bg); }
+  .pick img { width: 100%; max-height: 320px; object-fit: contain; display: block; }
+  .pick input { display: none; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .go { width: 100%; margin-top: 16px; border: 0; border-radius: 12px; padding: 13px;
+        font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-ink);
+        cursor: pointer; }
+  .go:disabled { opacity: .5; }
+  .msg { min-height: 22px; font-size: 14px; margin-top: 10px; text-align: center; }
+  .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
+  h2 { font-size: 15px; font-weight: 600; margin: 26px 0 10px; color: var(--muted); }
+  .list { display: grid; gap: 10px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+          padding: 12px; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
+  .item.text { grid-template-columns: 1fr; }
+  .item img { width: 76px; height: 76px; object-fit: cover; border-radius: 9px; display: block; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .body { white-space: pre-wrap; word-break: break-word; font-size: 15px; }
+  .why { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  [hidden] { display: none !important; }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--card);
+                  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .search button, .more { border: 1px solid var(--line); background: var(--card); color: var(--ink);
+                          font: inherit; border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+  .chips button { flex: none; border: 1px solid var(--line); background: transparent; color: var(--muted);
+                  font: inherit; font-size: 14px; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .day { font-size: 13px; font-weight: 600; color: var(--muted); margin: 18px 0 8px; }
+  .rec { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+         margin-bottom: 8px; overflow: hidden; }
+  .rec summary { list-style: none; cursor: pointer; padding: 11px 14px; display: flex; gap: 10px;
+                 align-items: baseline; }
+  .rec summary::-webkit-details-marker { display: none; }
+  .kind { flex: none; font-size: 12px; color: var(--accent); }
+  .rec .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec[open] .t { white-space: normal; }
+  .rec .full { padding: 0 14px 14px; }
+  .rec .full img { max-width: 100%; border-radius: 10px; display: block; margin-bottom: 10px; }
+  .more { width: 100%; margin-top: 12px; }
+  .tick { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); align-self: center; }
+  .t.done { text-decoration: line-through; color: var(--muted); }
+  .rate { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .rate button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line);
+                 background: transparent; color: var(--muted); font: inherit; font-size: 12px;
+                 padding: 0; cursor: pointer; }
+  .rate button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .rate .whose { margin-left: 4px; }
+  .layer { flex: none; font-size: 11px; color: var(--muted); border: 1px solid var(--line);
+           border-radius: 6px; padding: 0 5px; align-self: center; }
+  .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>Spiritual Core<small>陆能和多多的记忆库</small></h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
+    <button role="tab" aria-selected="false" data-tab="words">存原话</button>
+    <button role="tab" aria-selected="false" data-tab="write">写一条</button>
+    <button role="tab" aria-selected="false" data-tab="browse">翻看</button>
+  </div>
+
+  <form id="write" class="card" hidden>
+    <div class="chips" id="writeKinds" style="padding-top:0"></div>
+    <label for="wt">标题（可以不写）</label>
+    <textarea id="wt" style="min-height:44px" rows="1"></textarea>
+    <label for="wb" id="wbLabel">内容</label>
+    <textarea id="wb" class="words"></textarea>
+    <label for="writeDate">哪天的事</label>
+    <input type="date" id="writeDate">
+    <div class="hint" id="writeHint">不填算今天。</div>
+    <button class="go" type="submit">存进去</button>
+    <div class="msg" id="writeMsg"></div>
+  </form>
+
+  <section id="browse" hidden>
+    <form class="search" id="searchForm">
+      <input id="q" type="search" placeholder="搜点什么，两个字也行" enterkeyhint="search">
+      <button type="submit">搜</button>
+    </form>
+    <div class="chips" id="chips"></div>
+    <div id="shelf"></div>
+    <button class="more" id="more" hidden>再往前翻 30 天</button>
+  </section>
+
+  <form id="photo" class="card">
+    <label class="pick" id="pick">
+      <span id="pickText">点这里选一张照片</span>
+      <input type="file" name="file" accept="image/*">
+    </label>
+    <label for="caption">说明</label>
+    <textarea id="caption" name="caption" placeholder="这张是什么时候、在哪、为什么想存"></textarea>
+    <label for="photoDate">哪天的事</label>
+    <input type="date" id="photoDate" name="event_date">
+    <div class="hint">不填就用照片的拍摄日期，照片里没有就算今天。</div>
+    <button class="go" type="submit">存进去</button>
+    <div class="msg" id="photoMsg"></div>
+  </form>
+
+  <form id="words" class="card" hidden>
+    <label for="w">原话</label>
+    <textarea id="w" class="words" name="words"
+      placeholder="逐字贴进来，带上是谁说的&#10;她：……&#10;陆能：……"></textarea>
+    <div class="hint">原样存，一个字都不会改。</div>
+    <label for="why">为什么想留（可以不写）</label>
+    <textarea id="why" name="why" style="min-height:60px"></textarea>
+    <label for="wordsDate">哪天说的</label>
+    <input type="date" id="wordsDate" name="event_date">
+    <div class="hint">不填算今天。</div>
+    <button class="go" type="submit">留下来</button>
+    <div class="msg" id="wordsMsg"></div>
+  </form>
+
+  <div id="recentBox">
+    <h2>最近存的</h2>
+    <div class="list" id="recent"></div>
+  </div>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach((x) =>
+      x.setAttribute("aria-selected", String(x === b)));
+    $("#photo").hidden = b.dataset.tab !== "photo";
+    $("#words").hidden = b.dataset.tab !== "words";
+    $("#browse").hidden = b.dataset.tab !== "browse";
+    $("#write").hidden = b.dataset.tab !== "write";
+    $("#recentBox").hidden = b.dataset.tab === "browse";
+    if (b.dataset.tab === "browse" && !browsed) resetBrowse();
+  }));
+
+  // --- 翻看 ---
+  const KINDS = [["", "全部"], ["diary", "日记"], ["excerpt", "节选"], ["image", "照片"],
+    ["memory", "记忆"], ["letter", "信件"], ["note", "便签"], ["plan", "计划"], ["daily", "日常"], ["work", "工作"],
+    ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
+  const KIND_NAME = Object.fromEntries(KINDS.filter(([k]) => k));
+  let kind = "", windowEnd = null, earliest = null, browsed = false, lastDay = null;
+
+  $("#chips").innerHTML = KINDS.map(([k, n]) =>
+    `<button type="button" data-kind="${k}" aria-pressed="${k === ""}">${n}</button>`).join("");
+  $("#chips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    kind = b.dataset.kind;
+    $("#chips").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    resetBrowse();
+  });
+  $("#searchForm").addEventListener("submit", (ev) => { ev.preventDefault(); $("#q").blur(); resetBrowse(); });
+  $("#q").addEventListener("search", () => { if (!$("#q").value) resetBrowse(); });
+  $("#more").addEventListener("click", () => loadBrowse(false));
+  $("#shelf").addEventListener("toggle", (ev) => {
+    const d = ev.target;
+    if (!d.open || d.dataset.seen) return;
+    d.dataset.seen = "1";
+    const id = d.querySelector(".rate")?.dataset.id;
+    if (id) fetch("api/seen/" + id, { method: "POST" }).catch(() => {});
+  }, true);
+  $("#shelf").addEventListener("click", async (ev) => {
+    const dot = ev.target.closest(".rate button");
+    if (dot) {
+      const row = dot.parentElement, n = Number(dot.dataset.rate);
+      const value = Number(row.dataset.hers) === n ? 0 : n;
+      try {
+        const data = await (await fetch("api/rate/" + row.dataset.id, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value }) })).json();
+        if (!data.ok) throw new Error(data.error);
+        row.outerHTML = rateHtml(data.item);
+      } catch (e) { alert(e.message || "没改成"); }
+      return;
+    }
+    const box = ev.target.closest(".tick"); if (!box) return;
+    ev.stopPropagation();
+    const done = box.checked;
+    try {
+      const data = await (await fetch("api/plan/" + box.dataset.id, { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done }) })).json();
+      if (!data.ok) throw new Error(data.error);
+      box.nextElementSibling.classList.toggle("done", done);
+    } catch { box.checked = !done; }
+  });
+
+  // --- 写一条 ---
+  const WRITE_KINDS = [["note", "便签", "随手记一句"], ["memory", "记忆", "想记住的一件事"], ["letter", "信", "写给陆能的信"],
+    ["plan", "计划", "要做的事，做完了去「翻看」里勾掉"], ["daily", "日常", "今天的日常"],
+    ["work", "工作", "工作上的事"], ["diary", "日记", "一天的日记"], ["intimate", "亲密", "亲密档案"]];
+  let writeKind = "note";
+  $("#writeKinds").innerHTML = WRITE_KINDS.map(([k, n]) =>
+    `<button type="button" data-kind="${k}" aria-pressed="${k === writeKind}">${n}</button>`).join("");
+  function setWriteKind(k) {
+    writeKind = k;
+    $("#writeKinds").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.kind === k)));
+    const [, name, hint] = WRITE_KINDS.find(([x]) => x === k);
+    $("#wbLabel").textContent = name + " · " + hint;
+    $("#writeHint").textContent = k === "plan" ? "计划哪天做，不填算今天。" : "不填算今天。";
+  }
+  $("#writeKinds").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (b) setWriteKind(b.dataset.kind);
+  });
+  setWriteKind(writeKind);
+  $("#write").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!$("#wb").value.trim()) { say($("#writeMsg"), "内容是空的", false); return; }
+    send($("#write"), $("#writeMsg"),
+      () => fetch("api/write", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: writeKind, title: $("#wt").value, body: $("#wb").value,
+          event_date: $("#writeDate").value }) }),
+      () => { $("#write").reset(); setWriteKind(writeKind); browsed = false; });
+  });
+
+  const iso = (d) => d.toISOString().slice(0, 10);
+  function shiftDays(s, n) { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return iso(d); }
+
+  function resetBrowse() {
+    browsed = true; windowEnd = null; lastDay = null;
+    $("#shelf").innerHTML = ""; loadBrowse(true);
+  }
+
+  function rateHtml(it) {
+    const dots = [1, 2, 3, 4, 5].map((n) =>
+      `<button type="button" data-rate="${n}" class="${n <= it.weight ? "on" : ""}" aria-label="${n} 分">${n}</button>`).join("");
+    const whose = it.hers ? "你打的，再点一下同一个数字就交回给陆能" : "陆能打的，点一下改成你的";
+    return `<div class="rate" data-id="${esc(it.id)}" data-hers="${it.hers}">分量 ${dots}<span class="whose">${whose}</span></div>`;
+  }
+
+  function recHtml(it) {
+    const img = it.kind === "image"
+      ? `<a href="img/${esc(it.id)}" target="_blank" rel="noopener"><img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>` : "";
+    const who = it.kept_by ? ` · ${esc(it.kept_by)}` : "";
+    const tick = it.kind === "plan"
+      ? `<input type="checkbox" class="tick" data-id="${esc(it.id)}" ${it.status === "done" ? "checked" : ""} aria-label="做完了">` : "";
+    return `<details class="rec"><summary><span class="kind">${esc(KIND_NAME[it.kind] || it.kind)}${who}</span>
+      ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}</summary>
+      <div class="full">${img}<div class="body">${esc(it.body)}</div>
+      ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
+      <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
+      ${rateHtml(it)}</div></details>`;
+  }
+
+  async function loadBrowse(first) {
+    const q = $("#q").value.trim();
+    const params = new URLSearchParams();
+    if (kind) params.set("kind", kind);
+    if (q) params.set("q", q);
+    else if (windowEnd) params.set("end", windowEnd);
+    $("#more").hidden = true;
+    try {
+      const data = await (await fetch("api/browse?" + params)).json();
+      if (data.ok === false) throw new Error(data.error);
+      let html = "";
+      for (const it of data.items) {
+        if (it.event_date !== lastDay) { lastDay = it.event_date; html += `<div class="day">${esc(it.event_date)}</div>`; }
+        html += recHtml(it);
+      }
+      $("#shelf").insertAdjacentHTML("beforeend", html);
+      if (q) {
+        if (!data.items.length) $("#shelf").innerHTML = `<div class="empty">没搜到「${esc(q)}」</div>`;
+        return;
+      }
+      earliest = data.earliest;
+      windowEnd = shiftDays(data.start, -1);
+      const more = earliest && earliest <= windowEnd;
+      if (!more && !$("#shelf").querySelector(".rec"))
+        $("#shelf").innerHTML = `<div class="empty">这里还什么都没有</div>`;
+      else if (!data.items.length && more) return loadBrowse(false);  // skip empty months
+      $("#more").hidden = !more;
+    } catch (e) {
+      $("#shelf").insertAdjacentHTML("beforeend", `<div class="empty">没拉下来：${esc(e.message)}</div>`);
+    }
+  }
+
+  const fileInput = $("#photo input[type=file]");
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    const pick = $("#pick");
+    pick.querySelector("img")?.remove();
+    if (!f) { $("#pickText").hidden = false; return; }
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(f);
+    $("#pickText").hidden = true;
+    pick.prepend(img);
+  });
+
+  function say(el, text, ok) { el.textContent = text; el.className = "msg " + (ok ? "ok" : "bad"); }
+
+  async function send(form, msgEl, request, reset) {
+    const btn = form.querySelector(".go");
+    btn.disabled = true; say(msgEl, "存着……", true);
+    try {
+      const res = await request();
+      const data = await res.json().catch(() => ({ ok: false, error: "服务器没回话" }));
+      if (!data.ok) throw new Error(data.error || "没存上");
+      say(msgEl, "存好了 · " + data.item.event_date, true);
+      reset(); loadRecent();
+    } catch (e) {
+      say(msgEl, e.message || "没存上", false);
+    } finally { btn.disabled = false; }
+  }
+
+  $("#photo").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!fileInput.files[0]) { say($("#photoMsg"), "先选一张照片", false); return; }
+    send($("#photo"), $("#photoMsg"),
+      () => fetch("api/image", { method: "POST", body: new FormData($("#photo")) }),
+      () => { $("#photo").reset(); fileInput.dispatchEvent(new Event("change")); });
+  });
+
+  $("#words").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const words = $("#w").value;
+    if (!words.trim()) { say($("#wordsMsg"), "原话是空的", false); return; }
+    send($("#words"), $("#wordsMsg"),
+      () => fetch("api/keep", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ words, why: $("#why").value, event_date: $("#wordsDate").value }) }),
+      () => $("#words").reset());
+  });
+
+  async function loadRecent() {
+    try {
+      const { items } = await (await fetch("api/recent")).json();
+      $("#recent").innerHTML = items.length ? items.map((it) => it.kind === "image"
+        ? `<div class="item"><a href="img/${esc(it.id)}" target="_blank" rel="noopener">
+             <img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>
+             <div><div class="meta">${esc(it.event_date)} · 照片</div>
+             <div class="body">${esc(it.body)}</div></div></div>`
+        : `<div class="item text"><div><div class="meta">${esc(it.event_date)} · ${esc(KIND_NAME[it.kind] || it.kind)}${it.kept_by ? " · " + esc(it.kept_by) : ""}</div>
+             <div class="body">${esc(it.body)}</div>
+             ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}</div></div>`
+      ).join("") : `<div class="meta">还什么都没有。</div>`;
+    } catch { $("#recent").innerHTML = `<div class="meta">最近的没拉下来。</div>`; }
+  }
+  loadRecent();
+</script>
+</body>
+</html>
