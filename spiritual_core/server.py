@@ -148,6 +148,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         )
         if r.kind == "image":
             head += "\n（这是照片的说明，要看照片本身用 view_image）"
+            others = [x for x in store.batch_members(r.batch) if x.id != r.id]
+            if others:
+                head += f"\n同一组还有 {len(others)} 张：" + "、".join(x.id for x in others)
         extra = []
         linked = store.linked(r.id)
         if linked:

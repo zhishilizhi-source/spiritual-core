@@ -72,3 +72,23 @@ def test_backgrounds_only_serve_listed_files(env, tmp_path):
     assert client.get("/k/bg/a.jpg").content == b"jpeg"
     assert client.get("/k/bg/b.jpg").status_code == 404
     assert client.get("/k/bg/..%2Fcore.db").status_code == 404
+
+
+def test_photos_saved_together_show_as_one_entry(env):
+    import sys
+    sys.path.insert(0, "tests")
+    from test_store import _jpeg
+    store, client = env
+    for d in ("2026:09:01 10:00:00", "2026:09:02 10:00:00"):
+        r = client.post("/k/api/image", files={"file": ("a.jpg", _jpeg(d), "image/jpeg")},
+                        data={"caption": "一组画", "batch": "b-1"})
+        assert r.json()["ok"]
+    client.post("/k/api/image", files={"file": ("c.jpg", _jpeg(), "image/jpeg")}, data={"caption": "单张"})
+    items = client.get("/k/api/recent").json()["items"]
+    group = [i for i in items if i.get("images") and len(i["images"]) == 2]
+    assert len(group) == 1 and group[0]["title"] == "一组画 · 2 张" and group[0]["event_date"] == "2026-09-01"
+    assert sum(1 for i in items if i["kind"] == "image") == 2          # the group + the single one
+    assert [r.event_date for r in store.batch_members("b-1")] == ["2026-09-01", "2026-09-02"]
+    # a hostile batch value is dropped, not stored
+    client.post("/k/api/image", files={"file": ("d.jpg", _jpeg(), "image/jpeg")}, data={"batch": "../x y"})
+    assert store.recent(["image"], 1)[0].batch == ""

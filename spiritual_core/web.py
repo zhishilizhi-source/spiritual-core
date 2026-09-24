@@ -60,6 +60,7 @@ def mount(mcp, store: Store, secret: str) -> None:
                 data,
                 caption=str(form.get("caption") or ""),
                 event_date=str(form.get("event_date") or "") or None,
+                batch=str(form.get("batch") or ""),
             )
         except StoreError as e:
             return _err(str(e))
@@ -156,7 +157,8 @@ def mount(mcp, store: Store, secret: str) -> None:
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
         kinds = ["image", "excerpt", "inner", *PAGE_KINDS]
-        return JSONResponse({"items": [_item(r) for r in store.recent(kinds, 30)]})
+        items = _group([_item(r) for r in store.recent(kinds, 100)], store)
+        return JSONResponse({"items": items[:30]})
 
     @mcp.custom_route(p + "/api/inner", methods=["GET"])
     async def inner(request: Request):
@@ -173,7 +175,7 @@ def mount(mcp, store: Store, secret: str) -> None:
                 # A hit on a locked record would leak its words, so they are never searched here.
                 records = [r for r in store.search(q["q"], kinds, limit=100) if not r.locked]
                 w = store.weigh(records)
-                return JSONResponse({"items": [_item(r, w) for r in records]})
+                return JSONResponse({"items": _group([_item(r, w) for r in records], store)})
             end = q.get("end") or store.today().isoformat()
             start = q.get("start") or (date.fromisoformat(end) - timedelta(days=29)).isoformat()
             records = store.timeline(start, end, kinds, limit=1000)
@@ -182,7 +184,7 @@ def mount(mcp, store: Store, secret: str) -> None:
         records.sort(key=lambda r: (r.event_date, r.created_at), reverse=True)
         w = store.weigh(records)
         return JSONResponse({
-            "items": [_item(r, w) for r in records],
+            "items": _group([_item(r, w) for r in records], store),
             "start": start, "end": end, "earliest": store.earliest_date(),
         })
 
@@ -243,11 +245,40 @@ def _item(r, weighed: dict | None = None) -> dict:
         "title": r.title, "body": r.body, "why": r.why, "status": r.status,
         "kept_by": who_label(r),
         "weight": weight.effective(r), "hers": r.human_rating, "reads": r.read_count,
-        "unlocked_at": r.unlocked_at,
+        "unlocked_at": r.unlocked_at, "batch": r.batch,
     }
     if weighed and r.id in weighed:
         item["score"], item["layer"] = weighed[r.id]
     return item
+
+
+def _group(items: list[dict], store: Store | None = None) -> list[dict]:
+    """Photos saved together show as one entry holding all of them, where the first one was.
+
+    With a store, a group is filled out to its whole batch even if the page asked for fewer rows.
+    """
+    out, seen = [], {}
+    for it in items:
+        b = it.get("batch")
+        if it["kind"] != "image" or not b:
+            out.append(it)
+            continue
+        if b in seen:
+            seen[b]["images"].append(it["id"])
+            seen[b]["event_date"] = min(seen[b]["event_date"], it["event_date"])
+            continue
+        group = dict(it, images=[it["id"]])
+        seen[b] = group
+        out.append(group)
+    for b, g in seen.items():
+        if store is not None:
+            members = store.batch_members(b)
+            g["images"] = [m.id for m in members] or g["images"]
+            g["event_date"] = min([m.event_date for m in members] or [g["event_date"]])
+        if len(g["images"]) > 1:
+            base = "" if g["title"] == "照片" else g["title"]
+            g["title"] = f"{base} · {len(g['images'])} 张" if base else f"{len(g['images'])} 张"
+    return out
 
 
 def _err(msg: str) -> JSONResponse:

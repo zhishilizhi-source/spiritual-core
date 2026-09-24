@@ -43,6 +43,7 @@ MOODS = ("甜", "想你", "开心", "平静", "馋", "累", "难过", "生气", 
 _TRIGRAM_MIN = 3
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_BATCH_RE = re.compile(r"^[A-Za-z0-9-]{1,48}$")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS records (
@@ -65,7 +66,8 @@ CREATE TABLE IF NOT EXISTS records (
     read_count  INTEGER NOT NULL DEFAULT 0,
     last_read_at TEXT NOT NULL DEFAULT '',
     locked      INTEGER NOT NULL DEFAULT 0,
-    unlocked_at TEXT NOT NULL DEFAULT ''
+    unlocked_at TEXT NOT NULL DEFAULT '',
+    batch       TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS records_by_keeper ON records(kind, kept_by, event_date);
 CREATE INDEX IF NOT EXISTS records_by_date ON records(event_date, kind);
@@ -120,7 +122,7 @@ CREATE INDEX IF NOT EXISTS moods_by_day ON moods(day, at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
-SCHEMA_VERSION = "4"
+SCHEMA_VERSION = "5"
 
 # Columns added after v1, in the order they arrived. _migrate adds whichever are missing.
 _ADDED_COLUMNS = (
@@ -133,6 +135,7 @@ _ADDED_COLUMNS = (
     ("last_read_at", "TEXT NOT NULL DEFAULT ''"),
     ("locked", "INTEGER NOT NULL DEFAULT 0"),        # v4
     ("unlocked_at", "TEXT NOT NULL DEFAULT ''"),
+    ("batch", "TEXT NOT NULL DEFAULT ''"),              # v5
 )
 
 
@@ -158,6 +161,7 @@ class Record:
     last_read_at: str = ""
     locked: bool = False
     unlocked_at: str = ""
+    batch: str = ""          # photos saved together share one
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Record":
@@ -182,6 +186,7 @@ class Record:
             last_read_at=row["last_read_at"],
             locked=bool(row["locked"]),
             unlocked_at=row["unlocked_at"],
+            batch=row["batch"],
         )
 
 
@@ -509,8 +514,13 @@ class Store:
         caption: str = "",
         event_date: str | None = None,
         tags: list[str] | None = None,
+        batch: str = "",
     ) -> Record:
-        """Keep the original bytes. event_date falls back to the photo's EXIF date, then today."""
+        """Keep the original bytes. event_date falls back to the photo's EXIF date, then today.
+
+        Photos saved together share a batch; each stays its own record with its own date.
+        """
+        batch = batch if _BATCH_RE.match(batch or "") else ""
         try:
             info = media.probe(data)
         except media.MediaError as e:
@@ -529,7 +539,17 @@ class Store:
                 (rec.id, name, info.mime, info.width, info.height, len(data),
                  hashlib.sha256(data).hexdigest()),
             )
-        return rec
+            if batch:
+                self.db.execute("UPDATE records SET batch=? WHERE id=?", (batch, rec.id))
+        return self.get(rec.id)
+
+    def batch_members(self, batch: str) -> list[Record]:
+        if not batch:
+            return []
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE batch=? ORDER BY created_at, rowid", (batch,)
+        ).fetchall()
+        return [Record.from_row(r) for r in rows]
 
     def image(self, rid: str) -> tuple[Record, dict, bytes]:
         rec = self.get(rid)

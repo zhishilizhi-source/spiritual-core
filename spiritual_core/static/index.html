@@ -246,6 +246,12 @@
   .layer { border: 0; border-radius: 999px; padding: 0 7px; background: color-mix(in oklch, var(--glass) 26%, transparent);
            color: var(--muted); }
   .rec.sealed { border-style: dashed; border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .gallery img, .rec .full .gallery img { width: 100%; aspect-ratio: 1; height: auto; object-fit: cover;
+                                          border-radius: 10px; margin: 0; }
+  .strip { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+  .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
+  .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
 </style>
 </head>
@@ -758,14 +764,16 @@
     }
     const opened = it.kind === "inner" && it.unlocked_at
       ? `<div class="meta" style="margin-top:8px">陆能 ${when(it.unlocked_at)} 打开给你看的</div>` : "";
-    const img = it.kind === "image"
-      ? `<a href="img/${esc(it.id)}" target="_blank" rel="noopener"><img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>` : "";
+    const imgs = it.images || (it.kind === "image" ? [it.id] : []);
+    const img = imgs.length > 1
+      ? `<div class="gallery">${imgs.map((id) => `<a href="img/${esc(id)}" target="_blank" rel="noopener"><img src="img/${esc(id)}?size=thumb" alt="" loading="lazy"></a>`).join("")}</div>`
+      : imgs.length ? `<a href="img/${esc(imgs[0])}" target="_blank" rel="noopener"><img src="img/${esc(imgs[0])}?size=thumb" alt="" loading="lazy"></a>` : "";
     const who = it.kept_by ? ` · ${esc(it.kept_by)}` : "";
     const tick = it.kind === "plan"
       ? `<input type="checkbox" class="tick" data-id="${esc(it.id)}" ${it.status === "done" ? "checked" : ""} aria-label="做完了">` : "";
     return `<details class="rec"><summary><span class="kind">${esc(KIND_NAME[it.kind] || it.kind)}${who}</span>
       ${tick}<span class="t${it.status === "done" ? " done" : ""}">${esc(it.title)}</span>${it.layer ? `<span class="layer">${esc(it.layer)}</span>` : ""}</summary>
-      <div class="full">${img}<div class="body">${esc(it.body)}</div>
+      <div class="full">${img}${it.kind === "image" && it.body === "（没写说明）" ? "" : `<div class="body">${esc(it.body)}</div>`}
       ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
@@ -847,12 +855,16 @@
     const btn = $("#photo .go"), msg = $("#photoMsg");
     btn.disabled = true;
     const failed = [];
+    const batch = files.length > 1
+      ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10))
+      : "";
     for (let i = 0; i < files.length; i++) {
       say(msg, files.length > 1 ? `存着 ${i + 1}/${files.length}……` : "存着……", true);
       const fd = new FormData();
       fd.append("file", files[i]);
       fd.append("caption", $("#caption").value);
       fd.append("event_date", $("#photoDate").value);
+      fd.append("batch", batch);
       try {
         const data = await (await fetch("api/image", { method: "POST", body: fd })).json();
         if (!data.ok) throw new Error(data.error);
@@ -882,6 +894,10 @@
       $("#recent").innerHTML = items.length ? items.map((it) => it.sealed
         ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 心里话</div>
              <div class="body">陆能锁了一条心里话</div></div></div>`
+        : it.kind === "image" && it.images && it.images.length > 1
+        ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 照片 · ${it.images.length} 张</div>
+             <div class="strip">${it.images.slice(0, 5).map((id) => `<a href="img/${esc(id)}" target="_blank" rel="noopener"><img src="img/${esc(id)}?size=thumb" alt="" loading="lazy"></a>`).join("")}${it.images.length > 5 ? `<span class="more-n">+${it.images.length - 5}</span>` : ""}</div>
+             ${it.body && it.body !== "（没写说明）" ? `<div class="body">${esc(it.body)}</div>` : ""}</div></div>`
         : it.kind === "image"
         ? `<div class="item"><a href="img/${esc(it.id)}" target="_blank" rel="noopener">
              <img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>
