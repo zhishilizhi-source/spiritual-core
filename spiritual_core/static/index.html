@@ -147,6 +147,50 @@
   .lockmark { flex: none; font-size: 11px; color: var(--accent); border: 1px solid var(--accent);
               border-radius: 6px; padding: 0 6px; }
   .sealed-meta { margin-top: 4px; }
+  /* ---- Harmony: one glass material for every surface; "selected" is the mood color, never black. */
+  :root {
+    --surface: color-mix(in oklch, var(--card) 64%, transparent);
+    --surface-rim: color-mix(in oklch, white 60%, transparent);
+    --surface-shadow: 0 8px 24px color-mix(in oklch, var(--glass) 16%, transparent);
+    --field: color-mix(in oklch, var(--card) 70%, transparent);
+    --field-line: color-mix(in oklch, var(--line) 80%, transparent);
+    --on-bg: var(--glass); --on-ink: var(--ink);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: color-mix(in oklch, var(--card) 60%, transparent);
+      --surface-rim: color-mix(in oklch, white 10%, transparent);
+      --surface-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+      --field: color-mix(in oklch, black 16%, transparent);
+      --on-bg: var(--accent); --on-ink: var(--accent-ink);
+    }
+  }
+  .card, .rec, .item, .tabs, .search input, .search button, .more {
+    background: var(--surface); border: 1px solid var(--surface-rim); box-shadow: var(--surface-shadow);
+    -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+  }
+  .card, .rec, .item { border-radius: 18px; }
+  .tabs { border-radius: 16px; padding: 5px; }
+  .tabs button { border-radius: 12px; }
+  .tabs button[aria-selected="true"] { background: color-mix(in oklch, var(--glass) 38%, var(--card));
+                                       color: var(--ink); box-shadow: inset 0 1px 0 var(--surface-rim); }
+  textarea, input[type=date] { background: var(--field); border-color: var(--field-line); border-radius: 12px; }
+  textarea:focus, input[type=date]:focus, .search input:focus {
+    outline: none; border-color: color-mix(in oklch, var(--accent) 60%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--glass) 30%, transparent); }
+  .pick { background: var(--field); border-color: color-mix(in oklch, var(--accent) 35%, transparent); }
+  .chips button { background: var(--field); border-color: var(--field-line); color: var(--muted); }
+  .chips button[aria-pressed="true"] { background: var(--on-bg); color: var(--on-ink); border-color: transparent; }
+  .mood .chips button { background: var(--surface); }
+  .mood .chips button[aria-pressed="true"] { background: var(--surface); color: var(--ink); border-color: var(--dot); }
+  .close { background: var(--on-bg); color: var(--on-ink);
+           border: 1px solid var(--surface-rim); box-shadow: 0 4px 16px color-mix(in oklch, var(--glass) 35%, transparent);
+           -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .rate button { background: var(--field); border-color: var(--field-line); }
+  .rate button.on { background: var(--on-bg); border-color: transparent; color: var(--on-ink); }
+  .layer { border: 0; border-radius: 999px; padding: 0 7px; background: color-mix(in oklch, var(--glass) 26%, transparent);
+           color: var(--muted); }
+  .rec.sealed { border-style: dashed; border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
 </style>
 </head>
