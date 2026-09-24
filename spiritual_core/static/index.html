@@ -1209,7 +1209,17 @@
     if (!f) return;
     const pad = parseFloat(getComputedStyle(document.body).paddingBottom) || 24;
     const h = Math.round(innerHeight - (f.getBoundingClientRect().top + scrollY) - pad);
-    document.documentElement.style.setProperty("--form-h", Math.max(h, 0) + "px");
+    document.documentElement.style.setProperty("--form-h", Math.max(h, writeHeight()) + "px");
+  }
+  // 写一条 at its own natural size is the size she picked for all three.
+  let writeH = 0;
+  function writeHeight() {
+    if (writeH) return writeH;
+    const w = $("#write"), was = w.hidden;
+    w.hidden = false; w.style.cssText = "position:absolute;visibility:hidden;min-height:0;left:16px;right:16px";
+    writeH = Math.ceil(w.getBoundingClientRect().height);
+    w.style.cssText = ""; w.hidden = was;
+    return writeH;
   }
   addEventListener("resize", fitForms);
   new ResizeObserver(fitForms).observe($("#today"));
