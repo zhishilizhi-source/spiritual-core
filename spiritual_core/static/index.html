@@ -40,7 +40,7 @@
   * { box-sizing: border-box; }
   html { background: var(--bg); }
   html, body { margin: 0; color: var(--ink); }
-  html::before { content: ""; position: fixed; inset: 0; z-index: -1;
+  html::before { content: ""; position: fixed; inset: 0; z-index: -3;
                  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom)); }
   body {
     font: 16px/1.6 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -53,24 +53,19 @@
            box-shadow: 0 0 0 1.5px color-mix(in oklch, white 70%, transparent), 0 4px 14px rgba(40, 30, 60, .22); }
   h1 small, h2, .day { color: var(--on-sky) !important; }
   html::before { transition: background 1.2s ease; }
-  /* a few faint, still stars, only in the night scheme */
-  :root[data-scheme="dark"]::before {
-    background:
-      radial-gradient(1.2px 1.2px at 12% 14%, rgba(255,255,255,.55), transparent 100%),
-      radial-gradient(1px 1px at 27% 32%, rgba(255,255,255,.35), transparent 100%),
-      radial-gradient(1.4px 1.4px at 41% 9%, rgba(255,255,255,.5), transparent 100%),
-      radial-gradient(1px 1px at 58% 22%, rgba(255,255,255,.3), transparent 100%),
-      radial-gradient(1.2px 1.2px at 73% 12%, rgba(255,255,255,.45), transparent 100%),
-      radial-gradient(1px 1px at 86% 30%, rgba(255,255,255,.35), transparent 100%),
-      radial-gradient(1.3px 1.3px at 93% 6%, rgba(255,255,255,.5), transparent 100%),
-      radial-gradient(1px 1px at 8% 44%, rgba(255,255,255,.25), transparent 100%),
-      radial-gradient(1px 1px at 66% 41%, rgba(255,255,255,.25), transparent 100%),
-      radial-gradient(1.1px 1.1px at 34% 52%, rgba(255,255,255,.2), transparent 100%),
-      linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+  /* Light scheme: white paper with a fine grain and a faint scatter of moons and stars. */
+  :root { --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .30  0 0 0 0 .26  0 0 0 0 .38  0 0 0 .16 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); }
+  :root[data-scheme="light"]::before {
+    background: var(--grain), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><g fill='%235a4f78' fill-opacity='.075'><path d='M52 40a11 11 0 1 0 9 17a8.5 8.5 0 1 1-9-17z'/><path d='M176 150l2.2 6.3 6.3 2.2-6.3 2.2-2.2 6.3-2.2-6.3-6.3-2.2 6.3-2.2z'/><circle cx='150' cy='38' r='1.6'/><circle cx='112' cy='176' r='1.3'/><circle cx='206' cy='96' r='1.1'/><circle cx='30' cy='150' r='1.2'/><circle cx='84' cy='104' r='.9'/></g></svg>") 0 0 / 240px 240px,
+                linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
   }
+  /* Dark scheme: a drawn starfield sits above the nebula lights. */
+  #cosmos { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none;
+            opacity: 0; transition: opacity .8s ease; }
+  :root[data-scheme="dark"] #cosmos { opacity: 1; }
   /* Two lights on a quiet base: her mood top-left, the hour bottom-right. They drift and
      breathe slowly so the page has depth and never sits still as one flat color. */
-  body::before, body::after { content: ""; position: fixed; z-index: -1; pointer-events: none;
+  body::before, body::after { content: ""; position: fixed; z-index: -2; pointer-events: none;
     width: 130vmax; height: 130vmax; border-radius: 50%;
     transition: background 1.6s ease; will-change: transform, opacity; }
   body::before { left: -65vmax; top: -70vmax;
@@ -214,6 +209,16 @@
     -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
   }
   .card, .rec, .item { border-radius: 18px; }
+  /* the white is where the eye rests, so that's where the paper grain goes */
+  :root[data-scheme="light"] .card, :root[data-scheme="light"] .rec, :root[data-scheme="light"] .item {
+    background: var(--grain), var(--surface); }
+  :root[data-scheme="light"] textarea, :root[data-scheme="light"] input[type=date],
+  :root[data-scheme="light"] .pick { background: var(--grain), var(--field); }
+  /* at night the glass thins out so the stars come through, softly */
+  :root[data-scheme="dark"] .card, :root[data-scheme="dark"] .rec, :root[data-scheme="dark"] .item,
+  :root[data-scheme="dark"] .tabs {
+    background: color-mix(in oklch, var(--card) 40%, transparent);
+    -webkit-backdrop-filter: blur(5px) saturate(120%); backdrop-filter: blur(5px) saturate(120%); }
   .tabs { border-radius: 16px; padding: 5px; }
   .tabs button { border-radius: 12px; }
   .tabs button[aria-selected="true"] { background: color-mix(in oklch, var(--glass) 38%, var(--card));
@@ -239,6 +244,7 @@
 </style>
 </head>
 <body>
+  <canvas id="cosmos" aria-hidden="true"></canvas>
   <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span>
     <span class="theme" role="group" aria-label="深浅">
       <button type="button" data-theme="auto">自动</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
@@ -358,6 +364,7 @@
     try { localStorage.setItem("sc-theme", t); } catch {}
     document.querySelectorAll(".theme button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === t)));
     paintSky();
+    cosmos.sync();
   }
   let currentMood = null;
 
@@ -427,7 +434,105 @@
     b.setAttribute("aria-pressed", String(b.dataset.theme === (document.documentElement.dataset.theme || "auto"))));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMood(); });
   setInterval(paintSky, 10 * 60 * 1000);
+  // --- 星空（深色）---
+  // Stars are laid out from a fixed seed, so it's the same sky every visit. Static stars
+  // are drawn once to an offscreen layer; each frame only redraws the few that twinkle,
+  // plus a rare meteor. Nothing animates with reduced motion, or off-screen, or in light.
+  const cosmos = (() => {
+    const cv = document.getElementById("cosmos"), ctx = cv.getContext("2d");
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    const TINTS = ["255,255,255", "205,218,255", "255,234,214", "228,214,255"];
+    let W = 0, H = 0, dpr = 1, seed = 1, layer = null, twinkles = [], raf = 0, last = 0, meteor = null, nextMeteor = 0;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+
+    function dot(g, x, y, r, a, c, halo) {
+      if (halo) {
+        const grd = g.createRadialGradient(x, y, 0, x, y, r * 6);
+        grd.addColorStop(0, `rgba(${c},${a * 0.35})`); grd.addColorStop(1, `rgba(${c},0)`);
+        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r * 6, 0, 6.2832); g.fill();
+      }
+      g.fillStyle = `rgba(${c},${a})`; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+    }
+
+    function build() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      layer = document.createElement("canvas"); layer.width = cv.width; layer.height = cv.height;
+      const g = layer.getContext("2d"); g.scale(dpr, dpr);
+      seed = 20260713;                                    // the day it started
+      // the milky way: a soft band from bottom-left to top-right
+      const along = (t) => [t * W * 1.3 - W * 0.15, H * 0.92 - t * H * 0.85];
+      for (let i = 0; i < 26; i++) {
+        const [x, y] = along(i / 25), r = Math.min(W, H) * (0.16 + rnd() * 0.1);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r);
+        grd.addColorStop(0, `rgba(190,180,235,${0.06 + rnd() * 0.05})`); grd.addColorStop(1, "rgba(190,180,235,0)");
+        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+      }
+      twinkles = [];
+      const field = Math.round(W * H / 1400), dust = Math.round(W * H / 650);
+      for (let i = 0; i < field + dust; i++) {
+        const isDust = i >= field;
+        let x, y;
+        if (isDust) { const [bx, by] = along(rnd()); const off = gauss() * Math.min(W, H) * 0.08; x = bx + off * 0.7; y = by + off; }
+        else { x = rnd() * W; y = rnd() * H; }
+        const big = !isDust && rnd() < 0.035;
+        const s = { x, y, c: TINTS[Math.floor(rnd() * TINTS.length)],
+          r: isDust ? 0.25 + rnd() * 0.45 : big ? 1.1 + rnd() * 0.8 : 0.3 + rnd() * 0.7,
+          a: isDust ? 0.12 + rnd() * 0.3 : 0.3 + rnd() * 0.6, big, ph: rnd() * 6.2832, sp: 0.35 + rnd() * 0.9 };
+        if (!isDust && rnd() < 0.16) twinkles.push(s); else dot(g, s.x, s.y, s.r, s.a, s.c, s.big);
+      }
+    }
+
+    function frame(t) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(layer, 0, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const secs = t / 1000;
+      for (const s of twinkles) dot(ctx, s.x, s.y, s.r, s.a * (0.5 + 0.5 * Math.sin(secs * s.sp + s.ph)), s.c, s.big);
+      if (!still.matches) {
+        if (!meteor && secs > nextMeteor) {
+          meteor = { x: W * (0.3 + Math.random() * 0.7), y: H * Math.random() * 0.35, born: secs, life: 0.9 };
+          nextMeteor = secs + 25 + Math.random() * 35;
+        }
+        if (meteor) {
+          const k = (secs - meteor.born) / meteor.life;
+          if (k >= 1) meteor = null;
+          else {
+            const hx = meteor.x - k * 220, hy = meteor.y + k * 120, len = 90;
+            const grd = ctx.createLinearGradient(hx, hy, hx + len, hy - len * 0.55);
+            grd.addColorStop(0, `rgba(255,255,255,${0.75 * (1 - k)})`); grd.addColorStop(1, "rgba(255,255,255,0)");
+            ctx.strokeStyle = grd; ctx.lineWidth = 1.2; ctx.beginPath();
+            ctx.moveTo(hx, hy); ctx.lineTo(hx + len, hy - len * 0.55); ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function loop(t) {
+      raf = 0;
+      if (!running()) return;
+      if (t - last > 33) { frame(t); last = t; }             // ~30 fps is plenty for this
+      raf = requestAnimationFrame(loop);
+    }
+    const running = () => isDark() && !document.hidden && !still.matches;
+
+    function sync() {
+      if (!isDark()) { if (raf) cancelAnimationFrame(raf); raf = 0; return; }
+      if (!layer || W !== innerWidth || H !== innerHeight) build();
+      if (still.matches) { frame(0); return; }
+      if (!raf) { nextMeteor = performance.now() / 1000 + 8; raf = requestAnimationFrame(loop); }
+    }
+    let rt = 0;
+    addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { layer = null; sync(); }, 200); });
+    document.addEventListener("visibilitychange", sync);
+    still.addEventListener("change", sync);
+    return { sync };
+  })();
+
   paintSky();
+  cosmos.sync();
   loadMood();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
