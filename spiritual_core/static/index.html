@@ -897,7 +897,7 @@
   async function loadInner() {
     try {
       const { items } = await (await fetch("api/inner")).json();
-      $("#innerList").innerHTML = items.length ? items.map(recHtml).join("")
+      $("#innerList").innerHTML = items.length ? items.map((it) => recHtml(it)).join("")
         : `<div class="empty">他还没写。</div>`;
     } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
   }
