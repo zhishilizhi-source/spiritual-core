@@ -297,7 +297,7 @@
   #today:empty { display: none; }
   .count { display: flex; gap: 18px; font-size: 13px; color: var(--on-sky); margin: 0 2px 10px; }
   .count b { font-size: 17px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-  .sealed-note { font-size: 12px; color: var(--muted); margin: 2px 4px 0; }
+  .count .sealed-note { margin-left: auto; font-size: 12px; color: var(--muted); align-self: center; }
   .note-item { padding: 12px 0; border-top: 1px solid var(--line); }
   .note-item:first-child { border-top: 0; padding-top: 2px; }
   .note-item .body { line-height: 1.75; }
@@ -338,6 +338,23 @@
   :root[data-theme="plain"] .theme { background: var(--card); border-color: var(--line); }
   :root[data-theme="plain"] .mood .chips button { background: var(--card); }
   :root[data-theme="plain"] h1 img { box-shadow: none; }
+  /* ---- First impression: everything she can do fits on the first screen of a phone. */
+  h1 { margin: 0 0 8px; }
+  h1 img { width: 34px; height: 34px; border-radius: 9px; }
+  .mood { margin: 0 0 8px; }
+  .count { margin: 0 2px 6px; align-items: baseline; }
+  #today .rec { margin-bottom: 6px; }
+  #today .rec > summary { padding: 8px 14px; }
+  #today + .tabs { margin-top: 10px; }
+  .tabs { margin-bottom: 10px; padding: 4px; }
+  .tabs button { padding: 7px 0; }
+  form.card { padding: 12px 14px; }
+  form.card label { margin: 8px 0 4px; }
+  #photo .pick { min-height: 84px; }
+  #photo textarea { min-height: 0; height: 58px; }
+  form.card .hint { margin-top: 4px; }
+  .go { margin-top: 10px; padding: 10px; }
+  .msg { min-height: 0; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -396,10 +413,10 @@
       <input type="file" name="file" accept="image/*" multiple>
     </label>
     <label for="caption">说明</label>
-    <textarea id="caption" name="caption" placeholder="这张是什么时候、在哪、为什么想存（选了好几张就共用这一段）"></textarea>
+    <textarea id="caption" name="caption" placeholder="什么时候、在哪、为什么想存（几张共用这段）"></textarea>
     <label for="photoDate">哪天的事</label>
     <input type="date" id="photoDate" name="event_date">
-    <div class="hint">不填就用照片的拍摄日期，照片里没有就算今天。</div>
+    <div class="hint">不填就用拍摄日期，没有就算今天。</div>
     <button class="go" type="submit">存进去</button>
     <div class="msg" id="photoMsg"></div>
   </form>
@@ -1115,14 +1132,15 @@
 
   // Compact on purpose: one line each, opened on tap, so the forms below stay on the first screen.
   function renderToday(v) {
-    const count = v.days.length ? `<div class="count">${v.days.map((a) =>
-      `<span>${esc(a.name)}${a.ahead ? "还有" : ""} <b>${a.days}</b> 天</span>`).join("")}</div>` : "";
+    // the sealed 心里话 sits at the end of the count line instead of taking its own
+    const sealed = v.locked ? `<span class="sealed-note">锁着 ${v.locked} 条心里话</span>` : "";
+    const count = v.days.length || sealed ? `<div class="count">${v.days.map((a) =>
+      `<span>${esc(a.name)}${a.ahead ? "还有" : ""} <b>${a.days}</b> 天</span>`).join("")}${sealed}</div>` : "";
     const rows = [];
     if (v.diary) rows.push(recHtml(v.diary, `日记 · ${md(v.diary.event_date)}`));
     if (v.messages.length) rows.unshift(msgsHtml(v.messages));
     if (v.month_ago) rows.push(recHtml(v.month_ago, `一个月前 · ${md(v.month_ago_date)}`));
-    const sealed = v.locked ? `<div class="sealed-note">还有 ${v.locked} 条心里话锁着，想给你看的时候我自己打开。</div>` : "";
-    $("#today").innerHTML = count + rows.join("") + sealed;
+    $("#today").innerHTML = count + rows.join("");
   }
   $("#today").addEventListener("click", shelfClick);
   $("#today").addEventListener("toggle", (ev) => {
