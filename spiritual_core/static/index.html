@@ -45,6 +45,22 @@
            box-shadow: 0 0 0 1.5px color-mix(in oklch, white 70%, transparent), 0 4px 14px rgba(40, 30, 60, .22); }
   h1 small, h2, .day { color: var(--on-sky) !important; }
   html::before { transition: background 1.2s ease; }
+  /* Two lights on a quiet base: her mood top-left, the hour bottom-right. They drift and
+     breathe slowly so the page has depth and never sits still as one flat color. */
+  body::before, body::after { content: ""; position: fixed; z-index: -1; pointer-events: none;
+    width: 130vmax; height: 130vmax; border-radius: 50%;
+    transition: background 1.6s ease; will-change: transform, opacity; }
+  body::before { left: -65vmax; top: -70vmax;
+    background: radial-gradient(closest-side, var(--glow-a), transparent 72%);
+    animation: drift-a 21s ease-in-out infinite alternate; }
+  body::after { right: -70vmax; bottom: -75vmax;
+    background: radial-gradient(closest-side, var(--glow-b), transparent 72%);
+    animation: drift-b 27s ease-in-out infinite alternate; }
+  @keyframes drift-a { from { transform: translate(0, 0) scale(1); opacity: .95; }
+                       to   { transform: translate(9vw, 6vh) scale(1.12); opacity: .7; } }
+  @keyframes drift-b { from { transform: translate(0, 0) scale(1.08); opacity: .7; }
+                       to   { transform: translate(-8vw, -7vh) scale(.96); opacity: .95; } }
+  @media (prefers-reduced-motion: reduce) { body::before, body::after { animation: none; } }
   .mood { margin: -4px 0 14px; }
   .mood-now { font-size: 14px; color: var(--on-sky); }
   .mood-now b { color: var(--ink); font-weight: 600; }
@@ -279,10 +295,12 @@
   // nothing turns muddy, and buttons/labels/lines always match the sky.
   // The top of the sky is her mood, the bottom is the hour. Contrast checked at every hue (>= 4.9:1).
   const ROLES = {
-    light: { skyTop: [0.93, 0.045], skyBottom: [0.955, 0.03], bg: [0.965, 0.012], card: [0.99, 0.006],
+    light: { skyTop: [0.975, 0.010], skyBottom: [0.962, 0.012], glowA: [0.86, 0.11], glowB: [0.87, 0.08],
+             bg: [0.97, 0.008], card: [0.992, 0.004],
              line: [0.90, 0.02], accent: [0.52, 0.11], accentInk: [1, 0], ink: [0.30, 0.04],
              muted: [0.47, 0.03], onSky: [0.40, 0.04], dot: [0.72, 0.13] },
-    dark:  { skyTop: [0.34, 0.05], skyBottom: [0.22, 0.035], bg: [0.24, 0.02], card: [0.29, 0.025],
+    dark:  { skyTop: [0.22, 0.018], skyBottom: [0.17, 0.015], glowA: [0.40, 0.10], glowB: [0.33, 0.08],
+             bg: [0.22, 0.012], card: [0.27, 0.012],
              line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
              muted: [0.75, 0.025], onSky: [0.86, 0.025], dot: [0.78, 0.12] },
   };
@@ -297,7 +315,7 @@
     "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "生气": { h: 20, s: 1.2 }, "焦虑": { h: 205, s: 0.7 },
   };
   // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
-  const PHASE = { dawn: [75, 230], day: [60, 300], dusk: [40, 300], night: [285, 270] };
+  const PHASE = { dawn: [75, 230], day: [60, 210], dusk: [40, 300], night: [285, 265] };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   let currentMood = null;
 
@@ -315,11 +333,14 @@
     // Dark yellow is brown: in the dark scheme, yellow hues stay quiet in the surfaces
     // and let the accent and dots carry the color.
     const quiet = darkQuery.matches && hue >= 55 && hue <= 125 ? 0.5 : 1;
-    const skyTop = M.top ? ok(M.top[scheme], hue) : ok(R.skyTop, hue, scale * quiet);
+    // mood-specific depth (想你/馋/开心) now lives in the glow, not in a flat sky
+    const glowA = M.top ? ok([M.top[scheme][0] - (scheme === "dark" ? -0.04 : 0.01), M.top[scheme][1] + 0.02], hue)
+                        : ok(R.glowA, hue, scale * quiet);
     const accent = M.ac ? ok([R.accent[0], M.ac * (scheme === "dark" ? 0.85 : 1)], M.ah ?? hue)
                         : ok(R.accent, M.ah ?? hue, Math.min(scale, 1));
     const vars = {
-      "--sky-top": skyTop, "--sky-bottom": ok(R.skyBottom, phaseBottom),
+      "--sky-top": ok(R.skyTop, hue), "--sky-bottom": ok(R.skyBottom, phaseBottom),
+      "--glow-a": glowA, "--glow-b": ok(R.glowB, phaseBottom),
       "--bg": ok(R.bg, hue, quiet), "--card": ok(R.card, hue, quiet), "--line": ok(R.line, hue, quiet),
       "--accent": accent, "--accent-ink": ok(R.accentInk, M.ah ?? hue),
       "--glass": ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], hue, Math.min(scale, 1)),
@@ -327,7 +348,7 @@
     };
     const root = document.documentElement.style;
     for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", vars["--sky-top"]));
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", vars["--glow-a"]));
     document.querySelectorAll("#moodChips button").forEach((b) => b.style.setProperty("--dot", moodDot(b.dataset.mood)));
   }
 
