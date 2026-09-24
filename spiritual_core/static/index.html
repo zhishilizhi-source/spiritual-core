@@ -311,7 +311,7 @@
                background: color-mix(in oklch, var(--glass) 22%, transparent); }
   .her-reply span { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
   .layer.new { background: var(--on-bg); color: var(--on-ink); }
-  h2.put { margin: 18px 0 10px; }
+  #today + .tabs { margin-top: 16px; }
   /* ---- 极简: the first version's paper and ink. No painting, no lights, no stars, no glass. */
   :root[data-theme="plain"] {
     --bg: #f6f3ee; --card: #fffdf9; --ink: #2b2622; --muted: #7a7068; --on-sky: #7a7068;
@@ -354,7 +354,6 @@
 
   <section id="today" aria-label="今天"></section>
 
-  <h2 class="put">往库里放</h2>
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
     <button role="tab" aria-selected="false" data-tab="words">存原话</button>
