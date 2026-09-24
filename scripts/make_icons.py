@@ -10,9 +10,9 @@ from PIL import Image, ImageChops, ImageDraw
 
 S = 2048                                   # draw big, shrink for smooth edges
 # Dusk sinking into night: the moment both moons are in the sky.
-SKY = [(0.0, (238, 184, 162)), (0.45, (160, 120, 150)), (1.0, (66, 56, 94))]
+SKY = [(0.0, (250, 204, 184)), (0.45, (201, 160, 196)), (1.0, (118, 102, 166))]  # brighter, so pastel pages don't swallow it
 PALE = (255, 247, 236)
-WARM = (236, 158, 132)
+WARM = (244, 150, 120)
 OUT = Path(__file__).resolve().parents[1] / "spiritual_core" / "static"
 
 

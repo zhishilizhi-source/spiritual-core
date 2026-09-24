@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Spiritual Core</title>
-<link rel="icon" type="image/png" href="static/favicon.png?v=2">
-<link rel="apple-touch-icon" href="static/apple-touch-icon.png?v=2">
-<link rel="manifest" href="static/manifest.json?v=2">
+<link rel="icon" type="image/png" href="static/favicon.png?v=3">
+<link rel="apple-touch-icon" href="static/apple-touch-icon.png?v=3">
+<link rel="manifest" href="static/manifest.json?v=3">
 <meta name="apple-mobile-web-app-title" content="Spiritual Core">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f7e2d8" media="(prefers-color-scheme: light)">
@@ -41,7 +41,8 @@
   }
   h1 { font-size: 20px; font-weight: 600; letter-spacing: .02em; margin: 4px 0 16px;
        display: flex; align-items: center; gap: 12px; }
-  h1 img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+  h1 img { width: 40px; height: 40px; border-radius: 10px; flex: none;
+           box-shadow: 0 0 0 1.5px color-mix(in oklch, white 70%, transparent), 0 4px 14px rgba(40, 30, 60, .22); }
   h1 small, h2, .day { color: var(--on-sky) !important; }
   html::before { transition: background 1.2s ease; }
   .mood { margin: -4px 0 14px; }
@@ -76,9 +77,19 @@
   .pick img { width: 100%; max-height: 320px; object-fit: contain; display: block; }
   .pick input { display: none; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
-  .go { width: 100%; margin-top: 16px; border: 0; border-radius: 12px; padding: 13px;
-        font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-ink);
-        cursor: pointer; }
+  /* Glass: a thin wash of the mood's accent, a bright rim, blur behind. Text is ink,
+     checked >= 4.5:1 over the wash in both schemes. */
+  .go { width: 100%; margin-top: 16px; border-radius: 14px; padding: 13px;
+        font: inherit; font-weight: 600; color: var(--ink); cursor: pointer;
+        background: linear-gradient(135deg,
+          color-mix(in oklch, var(--glass) var(--glass-a), transparent),
+          color-mix(in oklch, var(--glass) var(--glass-b), transparent));
+        border: 1px solid color-mix(in oklch, white var(--glass-rim), transparent);
+        box-shadow: inset 0 1px 0 color-mix(in oklch, white 55%, transparent),
+                    0 6px 20px color-mix(in oklch, var(--glass) 30%, transparent);
+        -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); }
+  :root { --glass: #e8a88f; --glass-a: 42%; --glass-b: 18%; --glass-rim: 60%; }
+  @media (prefers-color-scheme: dark) { :root { --glass-a: 20%; --glass-b: 9%; --glass-rim: 18%; } }
   .go:disabled { opacity: .5; }
   .msg { min-height: 22px; font-size: 14px; margin-top: 10px; text-align: center; }
   .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
@@ -140,7 +151,7 @@
 </style>
 </head>
 <body>
-  <h1><img src="static/favicon.png?v=2" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span></h1>
+  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span></h1>
 
   <section class="mood" aria-label="心情">
     <div class="mood-now" id="moodNow">今天心情怎么样？点一下，天会跟着变。</div>
@@ -231,9 +242,16 @@
              line: [0.37, 0.03], accent: [0.80, 0.10], accentInk: [0.25, 0.04], ink: [0.95, 0.012],
              muted: [0.75, 0.025], onSky: [0.86, 0.025], dot: [0.78, 0.12] },
   };
-  // [hue, chroma scale]
-  const MOOD = { "甜": [355, 1], "想你": [40, 1], "开心": [85, 1], "平静": [165, 0.9], "馋": [345, 1.35],
-    "累": [290, 0.5], "难过": [250, 1], "生气": [20, 1.2], "焦虑": [205, 0.7] };
+  // h: hue, s: chroma scale. Optional per mood: top = sky-top [L, C] per scheme (a deeper,
+  // stickier sky), ah/ac = accent hue and chroma. Overrides were contrast-checked on their own.
+  const MOOD = {
+    "甜": { h: 355, s: 1 },
+    "想你": { h: 318, s: 1, top: { light: [0.87, 0.085], dark: [0.36, 0.09] }, ac: 0.14 },   // 魅惑紫，黏糊
+    "开心": { h: 92, s: 1, top: { light: [0.94, 0.10], dark: [0.34, 0.025] }, ah: 50, ac: 0.13 }, // 阳光
+    "平静": { h: 165, s: 0.9 },
+    "馋": { h: 2, s: 1, top: { light: [0.84, 0.10], dark: [0.33, 0.10] }, ac: 0.15 },       // 酒红，要有欲望
+    "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "生气": { h: 20, s: 1.2 }, "焦虑": { h: 205, s: 0.7 },
+  };
   // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
   const PHASE = { dawn: [75, 230], day: [60, 300], dusk: [40, 300], night: [285, 270] };
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -241,19 +259,26 @@
 
   const ok = ([l, c], h, scale = 1) => `oklch(${l} ${(c * scale).toFixed(3)} ${h})`;
   function phase(h) { return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night"; }
-  const moodDot = (m) => ok(ROLES[darkQuery.matches ? "dark" : "light"].dot, MOOD[m][0], Math.min(MOOD[m][1], 1));
+  const moodDot = (m) => ok(ROLES[darkQuery.matches ? "dark" : "light"].dot, MOOD[m].ah ?? MOOD[m].h,
+    MOOD[m].ac ? 1.1 : Math.min(MOOD[m].s, 1));
 
   function paintSky() {
-    const R = ROLES[darkQuery.matches ? "dark" : "light"];
+    const scheme = darkQuery.matches ? "dark" : "light";
+    const R = ROLES[scheme];
     const [phaseTop, phaseBottom] = PHASE[phase(new Date().getHours())];
-    const [hue, scale] = currentMood && MOOD[currentMood] ? MOOD[currentMood] : [phaseTop, 1];
+    const M = (currentMood && MOOD[currentMood]) || { h: phaseTop, s: 1 };
+    const hue = M.h, scale = M.s;
     // Dark yellow is brown: in the dark scheme, yellow hues stay quiet in the surfaces
     // and let the accent and dots carry the color.
     const quiet = darkQuery.matches && hue >= 55 && hue <= 125 ? 0.5 : 1;
+    const skyTop = M.top ? ok(M.top[scheme], hue) : ok(R.skyTop, hue, scale * quiet);
+    const accent = M.ac ? ok([R.accent[0], M.ac * (scheme === "dark" ? 0.85 : 1)], M.ah ?? hue)
+                        : ok(R.accent, M.ah ?? hue, Math.min(scale, 1));
     const vars = {
-      "--sky-top": ok(R.skyTop, hue, scale * quiet), "--sky-bottom": ok(R.skyBottom, phaseBottom),
+      "--sky-top": skyTop, "--sky-bottom": ok(R.skyBottom, phaseBottom),
       "--bg": ok(R.bg, hue, quiet), "--card": ok(R.card, hue, quiet), "--line": ok(R.line, hue, quiet),
-      "--accent": ok(R.accent, hue, Math.min(scale, 1)), "--accent-ink": ok(R.accentInk, hue),
+      "--accent": accent, "--accent-ink": ok(R.accentInk, M.ah ?? hue),
+      "--glass": ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], hue, Math.min(scale, 1)),
       "--ink": ok(R.ink, hue), "--muted": ok(R.muted, hue), "--on-sky": ok(R.onSky, hue),
     };
     const root = document.documentElement.style;
