@@ -257,6 +257,19 @@
   .turn.me .turn-h { color: var(--muted); }
   .turn-h span { font-weight: 400; color: var(--muted); margin-left: 6px; }
   .turn-b { white-space: pre-wrap; word-break: break-word; line-height: 1.65; }
+  .close-wrap { gap: 8px; }
+  .edit { pointer-events: auto; border: 1px solid var(--surface-rim); border-radius: 999px; padding: 8px 16px;
+          font: inherit; font-size: 14px; background: var(--surface); color: var(--ink); cursor: pointer;
+          -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .editor label { margin-top: 10px; }
+  .editor .e-title { width: 100%; font: inherit; color: var(--ink); background: var(--field);
+                     border: 1px solid var(--field-line); border-radius: 12px; padding: 10px 12px; }
+  .editor textarea { font-size: 15px; line-height: 1.65; }
+  .edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .edit-actions button { border-radius: 999px; padding: 8px 18px; font: inherit; font-size: 14px; cursor: pointer;
+                         border: 1px solid var(--field-line); background: var(--field); color: var(--ink); }
+  .edit-actions .e-save { background: var(--on-bg); color: var(--on-ink); border-color: transparent; font-weight: 600; }
+  .editor .msg { text-align: right; }
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
   .gallery img, .rec .full .gallery img { width: 100%; aspect-ratio: 1; height: auto; object-fit: cover;
                                           border-radius: 10px; margin: 0; }
@@ -680,7 +693,55 @@
     const id = d.querySelector(".rate")?.dataset.id;
     if (id) fetch("api/seen/" + id, { method: "POST" }).catch(() => {});
   }, true);
+  function editorHtml(it) {
+    const photo = it.kind === "image";
+    const text = photo && it.body === "（没写说明）" ? "" : it.body;
+    const lines = Math.min(24, Math.max(6, (text.match(/\n/g) || []).length + 2));
+    const group = photo && it.images && it.images.length > 1 ? `（这一组 ${it.images.length} 张一起改）` : "";
+    return `<div class="editor" data-id="${esc(it.id)}">
+      ${photo ? "" : `<label>标题</label><input class="e-title" type="text" value="${esc(it.title)}">`}
+      <label>${photo ? "说明" + group : "正文"}</label><textarea class="e-body" rows="${lines}">${esc(text)}</textarea>
+      <label>哪天的事</label><input class="e-date" type="date" value="${esc(it.event_date)}">
+      <div class="edit-actions"><button type="button" class="e-cancel">取消</button><button type="button" class="e-save">保存</button></div>
+      <div class="msg"></div><div class="hint">改之前的样子会自动留一份，改错了能找回来。</div></div>`;
+  }
+
+  function redraw(d, it) {
+    d.outerHTML = recHtml(it);
+  }
+
   async function shelfClick(ev) {
+    const editBtn = ev.target.closest(".edit");
+    if (editBtn) {
+      const d = editBtn.closest("details"), it = ITEMS.get(editBtn.dataset.id);
+      d.querySelector(".full").innerHTML = editorHtml(it);
+      d.querySelector(".e-body").focus();
+      return;
+    }
+    const cancel = ev.target.closest(".e-cancel");
+    if (cancel) {
+      const d = cancel.closest("details"), it = ITEMS.get(cancel.closest(".editor").dataset.id);
+      redraw(d, it); document.querySelector(`details .edit[data-id="${CSS.escape(it.id)}"]`)?.closest("details")?.setAttribute("open", "");
+      return;
+    }
+    const save = ev.target.closest(".e-save");
+    if (save) {
+      const ed = save.closest(".editor"), d = save.closest("details"), it = ITEMS.get(ed.dataset.id);
+      const body = ed.querySelector(".e-body").value;
+      const payload = { body: it.kind === "image" && !body.trim() ? "（没写说明）" : body,
+        event_date: ed.querySelector(".e-date").value,
+        title: ed.querySelector(".e-title") ? ed.querySelector(".e-title").value : null,
+        whole_batch: !!(it.images && it.images.length > 1) };
+      save.disabled = true; ed.querySelector(".msg").textContent = "存着……";
+      try {
+        const data = await (await fetch("api/edit/" + it.id, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })).json();
+        if (!data.ok) throw new Error(data.error);
+        redraw(d, data.item);
+        document.querySelector(`details .edit[data-id="${CSS.escape(data.item.id)}"]`)?.closest("details")?.setAttribute("open", "");
+      } catch (e) { ed.querySelector(".msg").textContent = e.message || "没存上"; save.disabled = false; }
+      return;
+    }
     const close = ev.target.closest(".close");
     if (close) {
       const d = close.closest("details");
@@ -789,7 +850,10 @@
     return `<div class="raw">${html}</div>`;
   }
 
+  const ITEMS = new Map();
+
   function recHtml(it) {
+    ITEMS.set(it.id, it);
     if (it.sealed) {
       return `<div class="rec sealed"><div class="sealed-row"><span class="kind">心里话</span>
         <span class="t">上了锁</span><span class="lockmark">锁着</span></div>
@@ -812,7 +876,7 @@
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
       ${rateHtml(it)}
-      <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`;
+      <div class="close-wrap">${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
   }
 
   async function loadBrowse(first) {

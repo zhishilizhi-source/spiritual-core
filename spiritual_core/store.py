@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS moods (
 );
 CREATE INDEX IF NOT EXISTS moods_by_day ON moods(day, at);
 
+-- every edit keeps what was there before, so a fix can always be undone
+CREATE TABLE IF NOT EXISTS revisions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id  TEXT NOT NULL,
+    at         TEXT NOT NULL,
+    by         TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    event_date TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS revisions_by_record ON revisions(record_id, at);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
@@ -435,6 +447,64 @@ class Store:
         scores = self.weigh(records)
         records.sort(key=lambda r: scores[r.id][0], reverse=True)
         return records[:n]
+
+    def edit(
+        self,
+        rid: str,
+        title: str | None = None,
+        body: str | None = None,
+        event_date: str | None = None,
+        by: str = "human",
+        whole_batch: bool = False,
+    ) -> Record:
+        """Fix a record's title, text or date. The old version goes to `revisions` first.
+
+        The AI's own 心里话 can't be edited from here, locked or not. For a photo, the text is
+        its caption (the title follows it); with whole_batch every photo in its group changes.
+        """
+        rec = self.get(rid)
+        if rec.kind == "inner":
+            raise StoreError("心里话是他的，不能从这里改")
+        if by not in KEEPERS:
+            raise StoreError("by 只能是 ai 或 human")
+        if event_date is not None:
+            event_date = self._check_date(event_date)
+        if body is not None:
+            body = body.replace("\r\n", "\n")
+            if rec.kind != "excerpt":
+                body = body.strip()
+            if not body.strip():
+                raise StoreError("正文不能改成空的")
+        if title is not None:
+            title = title.strip()
+        targets = self.batch_members(rec.batch) if whole_batch and rec.batch else [rec]
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            for t in targets:
+                new_body = body if body is not None else t.body
+                if t.kind == "image":
+                    new_title = (new_body.splitlines()[0][:40] if new_body and new_body != "（没写说明）" else "照片")
+                else:
+                    new_title = title if title else t.title
+                new_date = event_date or t.event_date
+                if (new_title, new_body, new_date) == (t.title, t.body, t.event_date):
+                    continue
+                self.db.execute(
+                    "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
+                    (t.id, now, by, t.title, t.body, t.event_date),
+                )
+                self.db.execute(
+                    "UPDATE records SET title=?, body=?, event_date=?, updated_at=? WHERE id=?",
+                    (new_title, new_body, new_date, now, t.id),
+                )
+        return self.get(rid)
+
+    def revisions(self, rid: str) -> list[dict]:
+        rows = self.db.execute(
+            "SELECT at, by, title, body, event_date FROM revisions WHERE record_id=? ORDER BY at, id",
+            (rid,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     APPEND_WINDOW_HOURS = 24
 

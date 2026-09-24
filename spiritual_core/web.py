@@ -117,6 +117,28 @@ def mount(mcp, store: Store, secret: str) -> None:
             return _err("请求格式不对")
         return JSONResponse({"ok": True, "item": _item(rec)})
 
+    @mcp.custom_route(p + "/api/edit/{rid}", methods=["POST"])
+    async def edit(request: Request):
+        """Her fixes: title, text, date. The previous version is kept."""
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError
+        except ValueError:
+            return _err("请求格式不对")
+        opt = lambda k: None if body.get(k) is None else str(body.get(k))  # noqa: E731
+        try:
+            rec = store.edit(
+                request.path_params["rid"], title=opt("title"), body=opt("body"),
+                event_date=opt("event_date") or None, by="human", whole_batch=bool(body.get("whole_batch")),
+            )
+        except StoreError as e:
+            return _err(str(e))
+        item = _item(rec, store.weigh([rec]))
+        if rec.batch:
+            item = _group([item], store)[0]
+        return JSONResponse({"ok": True, "item": item})
+
     @mcp.custom_route(p + "/api/rate/{rid}", methods=["POST"])
     async def rate(request: Request):
         """Her score. Final; 0 hands it back to mine."""

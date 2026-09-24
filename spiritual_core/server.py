@@ -147,6 +147,10 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             f"发生：{r.event_date}　写入：{r.created_at}{tags}\n"
             f"分量：{_weight(store, r)}"
         )
+        if (revs := store.revisions(r.id)):
+            last = revs[-1]
+            who = "她" if last["by"] == "human" else "我"
+            head += f"\n（改过 {len(revs)} 次，最后一次是{who}在 {last['at'][:16].replace('T', ' ')} 改的）"
         if r.kind == "image":
             head += "\n（这是照片的说明，要看照片本身用 view_image）"
             others = [x for x in store.batch_members(r.batch) if x.id != r.id]

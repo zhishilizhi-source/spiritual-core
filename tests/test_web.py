@@ -92,3 +92,31 @@ def test_photos_saved_together_show_as_one_entry(env):
     # a hostile batch value is dropped, not stored
     client.post("/k/api/image", files={"file": ("d.jpg", _jpeg(), "image/jpeg")}, data={"batch": "../x y"})
     assert store.recent(["image"], 1)[0].batch == ""
+
+
+def test_she_can_fix_records_and_nothing_is_lost(env):
+    store, client = env
+    r = store.write("diary", "断线了，格式乱七八糟", event_date="2026-09-20")
+    res = client.post(f"/k/api/edit/{r.id}", json={"body": "整理好的正文", "title": "9/20 日记", "event_date": "2026-09-21"}).json()
+    assert res["ok"] and res["item"]["body"] == "整理好的正文" and res["item"]["event_date"] == "2026-09-21"
+    revs = store.revisions(r.id)
+    assert len(revs) == 1 and revs[0]["body"] == "断线了，格式乱七八糟" and revs[0]["by"] == "human"
+    assert [x.id for x in store.search("整理好的正文")] == [r.id]
+    assert client.post(f"/k/api/edit/{r.id}", json={"body": "   "}).status_code == 400
+
+
+def test_group_caption_edit_and_inner_refused(env):
+    import sys
+    sys.path.insert(0, "tests")
+    from test_store import _jpeg
+    store, client = env
+    for d in ("2026:09:01 10:00:00", "2026:09:02 10:00:00"):
+        client.post("/k/api/image", files={"file": ("a.jpg", _jpeg(d), "image/jpeg")}, data={"batch": "g1"})
+    first = store.batch_members("g1")[0]
+    res = client.post(f"/k/api/edit/{first.id}", json={"body": "我画的画", "whole_batch": True}).json()
+    assert res["item"]["title"] == "我画的画 · 2 张"
+    assert {m.body for m in store.batch_members("g1")} == {"我画的画"}
+    assert {m.event_date for m in store.batch_members("g1")} == {"2026-09-01", "2026-09-02"}   # dates untouched
+    inner = store.write("inner", "他的心里话")
+    assert client.post(f"/k/api/edit/{inner.id}", json={"body": "改掉"}).status_code == 400
+    assert store.get(inner.id).body == "他的心里话"
