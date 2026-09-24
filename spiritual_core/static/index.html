@@ -45,7 +45,9 @@
   * { box-sizing: border-box; }
   html { background: var(--bar, var(--bg)); }
   html, body { margin: 0; color: var(--ink); }
-  html::before { content: ""; position: fixed; inset: 0; z-index: -3;
+  /* The sky reaches under the iPhone status bar and home bar too, so the top blends with the page. */
+  :root { --reach-t: calc(-1 * env(safe-area-inset-top, 0px)); --reach-b: calc(-1 * env(safe-area-inset-bottom, 0px)); }
+  html::before { content: ""; position: fixed; inset: var(--reach-t) 0 var(--reach-b); z-index: -3;
                  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom)); }
   body {
     font: 16px/1.6 -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -67,7 +69,8 @@
       var(--paint, linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))) center / cover no-repeat;
   }
   /* Dark scheme: a drawn starfield sits above the nebula lights. */
-  #cosmos { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none;
+  #cosmos { position: fixed; left: 0; top: var(--reach-t); width: 100vw;
+            height: calc(100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); z-index: -1; pointer-events: none;
             opacity: 0; transition: opacity .8s ease; }
   :root[data-scheme="dark"] #cosmos { opacity: 1; }
   /* Two lights on a quiet base: her mood top-left, the hour bottom-right. They drift and
@@ -298,8 +301,8 @@
     --field: var(--bg); --field-line: var(--line); --on-bg: var(--accent); --on-ink: var(--accent-ink);
   }
   :root[data-theme="plain"][data-scheme="dark"] {
-    --bg: #171513; --card: #211e1b; --ink: #ece6de; --muted: #a39990; --on-sky: #a39990;
-    --line: #34302b; --accent: #d08a72; --accent-ink: #1a1512; --ok: #86b592; --bad: #e0776b;
+    --bg: #0e0e10; --card: #18181b; --ink: #f4f4f5; --muted: #a1a1aa; --on-sky: #a1a1aa;
+    --line: #27272a; --accent: #f4a78f; --accent-ink: #18181b; --ok: #86efac; --bad: #fca5a5;
   }
   :root[data-theme="plain"]::before { background: var(--bg) !important; }
   :root[data-theme="plain"] body::before, :root[data-theme="plain"] body::after,
@@ -606,7 +609,7 @@
     }
 
     function build() {
-      dpr = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       layer = document.createElement("canvas"); layer.width = cv.width; layer.height = cv.height;
       const g = layer.getContext("2d"); g.scale(dpr, dpr);
@@ -690,7 +693,7 @@
 
     function sync() {
       if (!isDark() || isPlain()) { if (raf) cancelAnimationFrame(raf); raf = 0; return; }
-      if (!layer || W !== innerWidth || H !== innerHeight) build();
+      if (!layer || W !== cv.clientWidth || H !== cv.clientHeight) build();
       if (still.matches) { frame(0); return; }
       if (!raf) { nextMeteor = performance.now() / 1000 + 8; raf = requestAnimationFrame(loop); }
     }
