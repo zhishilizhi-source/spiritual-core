@@ -43,7 +43,7 @@
       color-scheme: dark;
   }
   * { box-sizing: border-box; }
-  html { background: var(--bg); }
+  html { background: var(--bar, var(--bg)); }
   html, body { margin: 0; color: var(--ink); }
   html::before { content: ""; position: fixed; inset: 0; z-index: -3;
                  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom)); }
@@ -98,6 +98,13 @@
   .mood-now { font-size: 14px; color: var(--on-sky); }
   .mood-now b { color: var(--ink); font-weight: 600; }
   .mood .chips { padding-top: 6px; }
+  .mood-now { display: block; border: 0; background: none; padding: 2px 0;
+              font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+  .mood-now::after { content: ""; display: inline-block; vertical-align: middle; width: 6px; height: 6px; margin-left: 8px;
+                     border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+                     transform: translateY(-2px) rotate(45deg); transition: transform .2s ease; }
+  .mood-now[aria-expanded="true"]::after { transform: translateY(1px) rotate(225deg); }
+  .mood:not(.open) .chips { display: none; }
   .mood .chips button { display: inline-flex; align-items: center; gap: 6px; color: var(--ink);
                         background: color-mix(in srgb, var(--card) 70%, transparent); }
   .mood .chips button::before { content: ""; width: 9px; height: 9px; border-radius: 50%;
@@ -318,7 +325,7 @@
     </span></h1>
 
   <section class="mood" aria-label="心情">
-    <div class="mood-now" id="moodNow">今天心情怎么样？点一下，天会跟着变。</div>
+    <button type="button" class="mood-now" id="moodNow" aria-expanded="false">今天心情怎么样？点这里挑一个。</button>
     <div class="chips" id="moodChips"></div>
   </section>
 
@@ -458,11 +465,16 @@
     // and let the accent and dots carry the color.
     const quiet = isDark() && hue >= 55 && hue <= 125 ? 0.5 : 1;
     // mood-specific depth (想你/馋/开心) now lives in the glow, not in a flat sky
-    const glowA = M.top && scheme === "light" ? ok([M.top.light[0] + 0.03, M.top.light[1] * 0.7], hue)
-                        : ok(R.glowA, hue, scale * quiet);
+    const gA = M.top && scheme === "light" ? [M.top.light[0] + 0.03, M.top.light[1] * 0.7]
+                                           : [R.glowA[0], R.glowA[1] * scale * quiet];
+    const glowA = ok(gA, hue);
+    // The strip behind the iPhone status bar: halfway between the mood glow and the sky under it.
+    const bar = scheme === "dark" ? ok(R.skyTop, DARK.base)
+                                  : ok([(gA[0] + R.skyTop[0]) / 2, (gA[1] + R.skyTop[1]) / 2], hue);
     const accent = M.ac ? ok([R.accent[0], M.ac * (scheme === "dark" ? 0.85 : 1)], M.ah ?? hue)
                         : ok(R.accent, M.ah ?? hue, Math.min(scale, 1));
     const vars = {
+      "--bar": bar,
       "--sky-top": ok(R.skyTop, scheme === "dark" ? DARK.base : hue),
       "--sky-bottom": ok(R.skyBottom, scheme === "dark" ? DARK.baseBottom : phaseBottom),
       "--glow-a": glowA,
@@ -478,8 +490,8 @@
     // 极简 keeps the first version's fixed paper colors from the stylesheet; mood only colors the dots.
     if (isPlain()) Object.keys(vars).forEach((k) => root.removeProperty(k));
     else for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
-    const bar = isPlain() ? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() : vars["--sky-top"];
-    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bar));
+    const strip = isPlain() ? getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() : bar;
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", strip));
     document.querySelectorAll("#moodChips button").forEach((b) => b.style.setProperty("--dot", moodDot(b.dataset.mood)));
   }
 
@@ -487,10 +499,15 @@
     currentMood = now ? now.mood : null;
     $("#moodNow").innerHTML = now
       ? `今天：<b>${esc(now.mood)}</b> · ${esc(now.at.slice(11, 16))}，陆能开窗会看到`
-      : "今天心情怎么样？点一下，天会跟着变。";
+      : "今天心情怎么样？点这里挑一个。";
     $("#moodChips").innerHTML = moods.map((m) =>
       `<button type="button" data-mood="${esc(m)}" aria-pressed="${m === currentMood}">${esc(m)}</button>`).join("");
     paintSky();
+  }
+
+  function foldMood(open) {
+    $(".mood").classList.toggle("open", open);
+    $("#moodNow").setAttribute("aria-expanded", String(open));
   }
 
   async function loadMood(mood) {
@@ -502,8 +519,9 @@
     } catch { paintSky(); }
   }
   document.addEventListener("click", (ev) => {
+    if (ev.target.closest("#moodNow")) { foldMood(!$(".mood").classList.contains("open")); return; }
     const b = ev.target.closest("#moodChips button");
-    if (b && b.dataset.mood !== currentMood) loadMood(b.dataset.mood);
+    if (b) { foldMood(false); if (b.dataset.mood !== currentMood) loadMood(b.dataset.mood); }
   });
   darkQuery.addEventListener("change", () => applyTheme(document.documentElement.dataset.theme || "plain"));
   document.querySelector(".theme").addEventListener("click", (ev) => {
