@@ -9,9 +9,10 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw
 
 S = 2048                                   # draw big, shrink for smooth edges
-BG = (31, 26, 23)
-PALE = (239, 228, 214)
-WARM = (208, 138, 114)
+# Dusk sinking into night: the moment both moons are in the sky.
+SKY = [(0.0, (238, 184, 162)), (0.45, (160, 120, 150)), (1.0, (66, 56, 94))]
+PALE = (255, 247, 236)
+WARM = (236, 158, 132)
 OUT = Path(__file__).resolve().parents[1] / "spiritual_core" / "static"
 
 
@@ -25,9 +26,22 @@ def crescent(cx: int, cy: int, r: int, cut_dx: int, cut_r: int) -> Image.Image:
     return ImageChops.subtract(disc(r, cx, cy), disc(cut_r, cx + cut_dx, cy))
 
 
+def sky() -> Image.Image:
+    img = Image.new("RGB", (S, S))
+    d = ImageDraw.Draw(img)
+    for y in range(S):
+        t = y / (S - 1)
+        for (t0, c0), (t1, c1) in zip(SKY, SKY[1:]):
+            if t0 <= t <= t1:
+                k = (t - t0) / (t1 - t0)
+                d.line([(0, y), (S, y)], fill=tuple(int(a + (b - a) * k) for a, b in zip(c0, c1)))
+                break
+    return img
+
+
 def square(scale: float = 1.0) -> Image.Image:
     """Full-bleed art. scale < 1 leaves the safe margin Android's maskable icons need."""
-    img = Image.new("RGB", (S, S), BG)
+    img = sky()
     c, r, gap = S // 2, int(S * 0.30 * scale), int(S * 0.045 * scale)
     img.paste(PALE, (0, 0), crescent(c - gap, c, r, int(r * 0.52), int(r * 0.93)))
     img.paste(WARM, (0, 0), crescent(c + gap, c, int(r * 0.78), -int(r * 0.40), int(r * 0.72)))
