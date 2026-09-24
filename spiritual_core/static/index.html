@@ -20,7 +20,9 @@
     let t = "plain";
     try { t = localStorage.getItem("sc-theme") || "plain"; } catch {}
     if (t === "auto") t = "plain";
-    const dark = t === "dark" || (t === "plain" && matchMedia("(prefers-color-scheme: dark)").matches);
+    let pd = null;
+    try { pd = localStorage.getItem("sc-plain"); } catch {}
+    const dark = t === "dark" || (t === "plain" && (pd ? pd === "dark" : matchMedia("(prefers-color-scheme: dark)").matches));
     document.documentElement.dataset.scheme = dark ? "dark" : "light";
     document.documentElement.dataset.theme = t;
   })();
@@ -60,8 +62,8 @@
   /* Light scheme: one of her own paintings, washed out like watercolor on paper. */
   :root[data-scheme="light"]::before {
     background:
-      linear-gradient(to bottom, color-mix(in oklch, var(--sky-top) 28%, transparent),
-                                 color-mix(in oklch, var(--sky-bottom) 28%, transparent)),
+      linear-gradient(to bottom, color-mix(in oklch, var(--sky-top) 12%, transparent),
+                                 color-mix(in oklch, var(--sky-bottom) 12%, transparent)),
       var(--paint, linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))) center / cover no-repeat;
   }
   /* Dark scheme: a drawn starfield sits above the nebula lights. */
@@ -423,8 +425,15 @@
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   const isDark = () => document.documentElement.dataset.scheme === "dark";
   const isPlain = () => document.documentElement.dataset.theme === "plain";
-  function applyTheme(t) {
-    const dark = t === "dark" || (t === "plain" && darkQuery.matches);
+  // 极简 has its own day/night: tapping it again while it's on flips between them (remembered).
+  // Until she flips it once, it follows the phone.
+  const plainDark = () => { let v = null; try { v = localStorage.getItem("sc-plain"); } catch {}
+                            return v ? v === "dark" : darkQuery.matches; };
+  function applyTheme(t, flip = false) {
+    if (flip) { try { localStorage.setItem("sc-plain", plainDark() ? "light" : "dark"); } catch {} }
+    const dark = t === "dark" || (t === "plain" && plainDark());
+    const pb = document.querySelector('.theme button[data-theme="plain"]');
+    if (pb) pb.textContent = t === "plain" ? (dark ? "极简·夜" : "极简·日") : "极简";
     document.documentElement.dataset.scheme = dark ? "dark" : "light";
     document.documentElement.dataset.theme = t;
     try { localStorage.setItem("sc-theme", t); } catch {}
@@ -498,10 +507,12 @@
   });
   darkQuery.addEventListener("change", () => applyTheme(document.documentElement.dataset.theme || "plain"));
   document.querySelector(".theme").addEventListener("click", (ev) => {
-    const b = ev.target.closest("button"); if (b) applyTheme(b.dataset.theme);
+    const b = ev.target.closest("button");
+    if (b) applyTheme(b.dataset.theme, b.dataset.theme === "plain" && isPlain());
   });
   document.querySelectorAll(".theme button").forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.theme === (document.documentElement.dataset.theme || "plain"))));
+  if (isPlain()) document.querySelector('.theme button[data-theme="plain"]').textContent = isDark() ? "极简·夜" : "极简·日";
   document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMood(); });
   setInterval(paintSky, 10 * 60 * 1000);
   // --- 星空（深色）---
