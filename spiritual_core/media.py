@@ -13,7 +13,9 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MODEL_MAX_SIDE = 1568
 THUMB_MAX_SIDE = 480
 
-_FORMATS = {"JPEG": ("jpg", "image/jpeg"), "PNG": ("png", "image/png"),
+# MPO is a JPEG with extra pictures appended (phone HDR shots, some cameras); its first picture
+# is a plain JPEG that every browser shows, so it is kept and served as one.
+_FORMATS = {"JPEG": ("jpg", "image/jpeg"), "MPO": ("jpg", "image/jpeg"), "PNG": ("png", "image/png"),
             "WEBP": ("webp", "image/webp"), "GIF": ("gif", "image/gif")}
 
 _EXIF_IFD = 0x8769

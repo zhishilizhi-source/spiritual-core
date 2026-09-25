@@ -124,6 +124,21 @@ def test_image_keeps_original_and_uses_exif_date(store):
     assert store.add_image(_jpeg()).event_date == store.today().isoformat()
 
 
+def test_image_takes_mpo_as_jpeg(store):
+    import io
+    from PIL import Image
+    from spiritual_core import media
+    frames = [Image.new("RGB", (800, 600), c) for c in ((200, 120, 90), (90, 120, 200))]
+    buf = io.BytesIO()
+    frames[0].save(buf, "MPO", save_all=True, append_images=frames[1:])
+    data = buf.getvalue()
+    assert Image.open(io.BytesIO(data)).format == "MPO"
+    rec = store.add_image(data, caption="两张叠一起的")
+    got, info, raw = store.image(rec.id)
+    assert raw == data and info["mime"] == "image/jpeg" and info["width"] == 800
+    assert media.render(raw, media.THUMB_MAX_SIDE)[:2] == b"\xff\xd8"
+
+
 def test_image_rejects_non_images(store):
     with pytest.raises(StoreError):
         store.add_image(b"not a picture at all")
