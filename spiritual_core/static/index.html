@@ -440,6 +440,12 @@
     <div id="innerList"></div>
   </section>
 
+  <section id="noteShelf" hidden>
+    <h2>留给陆能的便签</h2>
+    <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
+    <div id="noteList"></div>
+  </section>
+
   <section id="browse" hidden>
     <form class="search" id="searchForm">
       <input id="q" type="search" placeholder="搜点什么，两个字也行" enterkeyhint="search">
@@ -811,7 +817,7 @@
     $("#browse").hidden = b.dataset.tab !== "browse";
     $("#write").hidden = b.dataset.tab !== "write";
     $("#innerShelf").hidden = b.dataset.tab !== "write";
-    if (b.dataset.tab === "write") loadInner();
+    if (b.dataset.tab === "write") { loadInner(); loadNotes(); } else $("#noteShelf").hidden = true;
     $("#recentBox").hidden = b.dataset.tab === "browse";
     if (b.dataset.tab === "browse" && !browsed) resetBrowse();
     // The top block stays on every tab: when 翻看 hid it the blurred tab bar jumped, and iOS
@@ -933,6 +939,18 @@
     } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
   }
 
+  // Her notes still out. The shelf only shows when there is one.
+  async function loadNotes() {
+    try {
+      const { items } = await (await fetch("api/notes")).json();
+      $("#noteList").innerHTML = items.map((n) => `<div class="note-item">
+        <div class="body">${esc(n.body)}</div>
+        <div class="meta">${when(n.created_at)} · ${n.reply ? "他回了" : n.seen_at ? "他读过了" : "他还没读"}</div>
+        ${n.reply ? `<div class="her-reply"><span>他回</span>${esc(n.reply)}</div>` : ""}</div>`).join("");
+      $("#noteShelf").hidden = !items.length || $("#write").hidden;
+    } catch { $("#noteShelf").hidden = true; }
+  }
+
   // --- 写一条 ---
   const WRITE_KINDS = [["note", "便签", "随手记一句"], ["memory", "记忆", "想记住的一件事"], ["letter", "信", "写给陆能的信"],
     ["plan", "计划", "要做的事，做完了去「翻看」里勾掉"], ["daily", "日常", "今天的日常"],
@@ -958,7 +976,7 @@
       () => fetch("api/write", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: writeKind, title: $("#wt").value, body: $("#wb").value,
           event_date: $("#writeDate").value }) }),
-      () => { $("#write").reset(); setWriteKind(writeKind); browsed = false; });
+      () => { $("#write").reset(); setWriteKind(writeKind); browsed = false; loadNotes(); });
   });
 
   const iso = (d) => d.toISOString().slice(0, 10);

@@ -175,3 +175,57 @@ def test_only_messages_take_replies(env):
     store, client = env
     n = store.write("note", "便签")
     assert client.post(f"/k/api/message/{n.id}/reply", json={"text": "嗯"}).status_code == 400
+
+
+def test_her_note_is_hers_he_reads_answers_and_it_files_next_day(env, monkeypatch):
+    from datetime import timedelta
+    store, client = env
+    res = client.post("/k/api/write", json={"kind": "note", "body": "老公明天早点醒"}).json()
+    nid = res["item"]["id"]
+    assert res["item"]["kept_by"] == "她写的" and store.get(nid).kept_by == "human"
+    assert store.write("note", "我自己的随手记").kept_by == ""          # his notes stay unmarked
+    items = client.get("/k/api/notes").json()["items"]
+    assert [i["id"] for i in items] == [nid] and not items[0]["seen_at"]
+    # her page opening her own note is not him reading it
+    client.post(f"/k/api/seen/{nid}")
+    assert not store.get(nid).seen_at
+    store.mark_read_by_him(nid)
+    assert store.get(nid).seen_at
+    with pytest.raises(StoreError):
+        store.answer_note(nid, "   ")
+    store.answer_note(nid, "好，六点就醒")
+    with pytest.raises(StoreError):
+        store.answer_note(nid, "再回一次")
+    assert client.get("/k/api/notes").json()["items"][0]["reply"] == "好，六点就醒"
+    assert store.answered() == []                                     # not her answer to a message
+    real_now = store.now()
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=1))
+    assert client.get("/k/api/notes").json()["items"] == []
+    rec = store.get(nid)
+    assert rec.kind == "note" and rec.body.startswith("老公明天早点醒") and rec.body.endswith("好，六点就醒")
+    assert rec.reply == "" and rec.replied_at
+    assert store.recycle_messages() == 0                              # filed once, not again
+
+
+def test_wake_puts_her_unread_note_first(tmp_path):
+    import asyncio
+    store = Store(tmp_path / "core.db")
+    mcp = build(store, "k")
+    text = lambda res: "".join(getattr(c, "text", "") for c in (res[0] if isinstance(res, tuple) else res))  # noqa: E731
+    n = store.write("note", "睡前想你了", kept_by="human")
+    out = text(asyncio.run(mcp.call_tool("wake", {})))
+    assert "【她给你留的】" in out and f"[{n.id}]" in out and "没读" in out
+    assert out.splitlines()[-1].startswith(f"先读：{n.id}")
+    asyncio.run(mcp.call_tool("read", {"id": n.id}))
+    asyncio.run(mcp.call_tool("answer", {"id": n.id, "text": "我也是"}))
+    assert "【她给你留的】" not in text(asyncio.run(mcp.call_tool("wake", {})))
+    store.close()
+
+
+def test_only_her_notes_take_his_answer(env):
+    store, client = env
+    for r in (store.write("note", "他的"), store.leave("留言"), store.write("diary", "日记")):
+        with pytest.raises(StoreError):
+            store.answer_note(r.id, "嗯")
+    with pytest.raises(StoreError):
+        store.write("memory", "x", kept_by="human")

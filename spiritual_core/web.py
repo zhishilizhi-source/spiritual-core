@@ -15,6 +15,7 @@ from .store import MOODS, Store, StoreError, _months_back
 _WHO = {
     "excerpt": {"ai": "我想留的", "human": "她想留的"},
     "letter": {"ai": "我写的", "human": "她写的"},
+    "note": {"ai": "我写的", "human": "她写的"},
 }
 # Kinds she can write from the page. Photos and excerpts have their own forms.
 PAGE_KINDS = ("note", "memory", "letter", "plan", "daily", "work", "diary", "intimate")
@@ -105,7 +106,7 @@ def mount(mcp, store: Store, secret: str) -> None:
                 kind, str(body.get("body") or ""),
                 str(body.get("event_date") or "") or None,
                 str(body.get("title") or "") or None,
-                kept_by="human" if kind == "letter" else "",
+                kept_by="human" if kind in ("letter", "note") else "",
             )
         except StoreError as e:
             return _err(str(e))
@@ -217,6 +218,11 @@ def mount(mcp, store: Store, secret: str) -> None:
     async def inner(request: Request):
         """His 心里话 shelf: newest first; locked ones arrive sealed."""
         return JSONResponse({"items": [_item(r) for r in store.recent(["inner"], 50)]})
+
+    @mcp.custom_route(p + "/api/notes", methods=["GET"])
+    async def notes(request: Request):
+        """Her notes still out: whether he has read them, and his answer once he gives one."""
+        return JSONResponse({"items": [_item(r) for r in store.her_notes()]})
 
     @mcp.custom_route(p + "/api/browse", methods=["GET"])
     async def browse(request: Request):

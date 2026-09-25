@@ -37,6 +37,10 @@ LOCKABLE = ("inner",)
 KEEPERS = ("ai", "human")
 # Kinds that must say whose they are: excerpt = who wanted it kept, letter = who wrote it.
 NEEDS_KEEPER = ("excerpt", "letter")
+# Kinds that may say whose they are. A note she writes on the page is marked human: it is
+# a line left for him, the mirror of `message` — he reads it, answers, and a day later his
+# answer is filed under her words.
+MAY_KEEPER = ("note",)
 
 PLAN_STATUSES = ("open", "done")
 
@@ -302,8 +306,8 @@ class Store:
             if kept_by not in KEEPERS:
                 what = "谁想留的" if kind == "excerpt" else "谁写的"
                 raise StoreError(f"{kind} 要写明是{what}：填 ai 或 human")
-        elif kept_by:
-            raise StoreError("kept_by 只用在 excerpt 和 letter 上")
+        elif kept_by and (kind not in MAY_KEEPER or kept_by not in KEEPERS):
+            raise StoreError("kept_by 只用在 excerpt、letter 和 note 上，填 ai 或 human")
         status = "open" if kind == "plan" else ""
         if kind != "excerpt":
             body = (body or "").strip()
@@ -836,19 +840,71 @@ class Store:
                 body = f"{r.body}\n\n—— 多多回（{when}）——\n{r.reply}"
                 self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
                                 (body, now, r.id))
-        return len(rows)
+        return len(rows) + self._file_her_notes(today, now)
 
     def answered(self, days: int = 2) -> list[Record]:
         """Her answers to his messages in the last few days, filed away or not."""
         since = (self.today() - timedelta(days=days)).isoformat()
         rows = self.db.execute(
-            "SELECT * FROM records WHERE reply <> '' AND substr(replied_at, 1, 10) >= ?"
-            " ORDER BY replied_at DESC", (since,)).fetchall()
+            "SELECT * FROM records WHERE reply <> '' AND kept_by <> 'human'"
+            " AND substr(replied_at, 1, 10) >= ? ORDER BY replied_at DESC", (since,)).fetchall()
         return [Record.from_row(r) for r in rows]
 
     def unseen_messages(self) -> int:
         return self.db.execute(
             "SELECT count(*) FROM records WHERE kind='message' AND seen_at=''").fetchone()[0]
+
+    # --- her notes: she leaves a line for him, he answers when he likes ---
+    # seen_at = when he first read it; reply/replied_at = his answer. Once filed, the answer
+    # lives in the body and reply is emptied, replied_at kept.
+
+    def her_notes(self) -> list[Record]:
+        """Notes she left that are still out: not answered yet, or answered today."""
+        self.recycle_messages()
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE kind='note' AND kept_by='human'"
+            " AND (replied_at = '' OR reply <> '') ORDER BY created_at DESC, rowid DESC").fetchall()
+        return [Record.from_row(r) for r in rows]
+
+    def mark_read_by_him(self, rid: str) -> None:
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            self.db.execute(
+                "UPDATE records SET seen_at=? WHERE id=? AND kind='note' AND kept_by='human'"
+                " AND seen_at=''", (now, rid))
+
+    def answer_note(self, rid: str, text: str) -> Record:
+        rec = self.get(rid)
+        if rec.kind != "note" or rec.kept_by != "human":
+            raise StoreError("只有她写的便签能回")
+        if rec.replied_at:
+            raise StoreError("这张已经回过了")
+        text = (text or "").replace("\r\n", "\n").strip()
+        if not text:
+            raise StoreError("回复不能是空的")
+        now = self.now().isoformat(timespec="seconds")
+        with self.db:
+            self.db.execute(
+                "UPDATE records SET reply=?, replied_at=?, seen_at=CASE WHEN seen_at='' THEN ? ELSE seen_at END,"
+                " updated_at=? WHERE id=?", (text, now, now, now, rid))
+        return self.get(rid)
+
+    def _file_her_notes(self, today: str, now: str) -> int:
+        """Her notes he answered before today take his answer under her words."""
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE kind='note' AND kept_by='human' AND reply <> ''"
+            " AND substr(replied_at, 1, 10) < ?", (today,)).fetchall()
+        with self.db:
+            for row in rows:
+                r = Record.from_row(row)
+                self.db.execute(
+                    "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
+                    (r.id, now, "human", r.title, r.body, r.event_date))
+                when = r.replied_at[5:16].replace("T", " ")
+                body = f"{r.body}\n\n—— 陆能回（{when}）——\n{r.reply}"
+                self.db.execute("UPDATE records SET body=?, reply='', updated_at=? WHERE id=?",
+                                (body, now, r.id))
+        return len(rows)
 
     def latest_diary(self) -> Record | None:
         row = self.db.execute(

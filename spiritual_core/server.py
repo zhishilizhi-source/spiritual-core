@@ -123,7 +123,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         elif w["mood_yesterday"]:
             m = w["mood_yesterday"]
             head += f"\n她今天还没点心情；昨天最后是：{m['mood']}（{m['at'][11:16]}）"
-        parts = [head, "【昨天和今天】\n" + _compact(w["days"], "（这两天还没有记录）")]
+        waiting = [r for r in store.her_notes() if not r.replied_at]
+        parts = [head, *_her_notes(waiting), "【昨天和今天】\n" + _compact(w["days"], "（这两天还没有记录）")]
         parts += _replies()
         if w["last_diary"]:
             parts.append("【最近一篇日记】（这两天没写，线接在这里）\n" + _lines(w["last_diary"], ""))
@@ -142,7 +143,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         # 先读 stays short: what's pinned, the newest diary, and a handoff only if it is newer
         diaries = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
         newest = max(diaries, key=lambda r: (r.event_date, r.created_at), default=None)
-        first = [r.id for r in w["pinned"]] + ([newest.id] if newest else [])
+        first = [r.id for r in waiting if not r.seen_at]
+        first += [r.id for r in w["pinned"]] + ([newest.id] if newest else [])
         first += [h.id for h in w["handoff"] if newest is None or h.created_at > newest.created_at]
         tail = f"先读：{'、'.join(first)}" if first else ""
         if (n_locked := store.locked_count()):
@@ -152,6 +154,14 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         if tail:
             parts.append(tail)
         return "\n\n".join(parts)
+
+    def _her_notes(waiting: list[Record]) -> list[str]:
+        if not waiting:
+            return []
+        return ["【她给你留的】（读过想回就用 answer）\n" + "\n".join(
+            f"[{r.id}] {r.created_at[5:16].replace('T', ' ')} · {r.title}"
+            + ("" if r.seen_at else " · 没读")
+            for r in waiting)]
 
     def _replies() -> list[str]:
         store.recycle_messages()
@@ -172,7 +182,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         rows = store.db.execute(
             "SELECT * FROM records WHERE created_at > ? ORDER BY created_at", (stamp,)).fetchall()
         fresh = [Record.from_row(r) for r in rows]
-        parts = [head, f"【{since} 之后新写的】\n" + _compact(fresh, "（没有新的）"), *_replies()]
+        waiting = [r for r in store.her_notes() if not r.replied_at]
+        parts = [head, *_her_notes(waiting), f"【{since} 之后新写的】\n" + _compact(fresh, "（没有新的）"),
+                 *_replies()]
         return "\n\n".join(parts)
 
     @mcp.tool()
@@ -197,6 +209,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
     def read(id: str) -> str:
         """读一条记录全文。同一天的节选、照片、原文和挂上的记录会列在末尾。"""
         store.touch(id)
+        store.mark_read_by_him(id)
         r = store.get(id)
         tags = f"\n标签：{', '.join(r.tags)}" if r.tags else ""
         head = (
@@ -358,6 +371,14 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         她回了什么，wake 会在【她回你的留言】里告诉我。"""
         r = store.leave(body, title or None)
         return f"留好了，她打开网页就看得到：{_line(r)}"
+
+    @mcp.tool()
+    @guarded
+    def answer(id: str, text: str) -> str:
+        """回她写给我的便签（wake 里【她给你留的】那几张）。回一次就定了，改不了。
+        她在网页上马上看得到；第二天我的回复自动接在她的话下面，这张便签就收起来了。"""
+        r = store.answer_note(id, text)
+        return f"回好了，她打开网页就看得到：{_line(r)}"
 
     @mcp.tool()
     @guarded
