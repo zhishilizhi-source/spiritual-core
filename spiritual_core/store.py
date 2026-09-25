@@ -790,12 +790,11 @@ class Store:
         return self.write("message", body, title=title, tags=[MESSAGE_TAG])
 
     def page_messages(self) -> list[Record]:
-        """What the top of her page shows: today's messages and any she hasn't opened."""
+        """What the top of her page shows: every message still out. One she hasn't answered
+        stays however old; one she answered is filed the next day and leaves on its own."""
         self.recycle_messages()
         rows = self.db.execute(
-            "SELECT * FROM records WHERE kind='message' AND (event_date >= ? OR seen_at = '')"
-            " ORDER BY created_at DESC, rowid DESC",
-            (self.today().isoformat(),),
+            "SELECT * FROM records WHERE kind='message' ORDER BY created_at DESC, rowid DESC"
         ).fetchall()
         return [Record.from_row(r) for r in rows]
 

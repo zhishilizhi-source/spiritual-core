@@ -160,15 +160,17 @@ def test_message_reply_then_filed_as_note_next_day(env, monkeypatch):
     assert [x.id for x in store.answered()] == [m.id]
 
 
-def test_seen_messages_from_before_today_leave_the_page(env, monkeypatch):
+def test_unanswered_messages_stay_on_the_page_until_answered(env, monkeypatch):
     from datetime import timedelta
     store, client = env
-    old = store.leave("昨天的")
+    seen = store.leave("她看过没回的")
     unread = store.leave("没看的")
-    store.mark_seen([old.id])
+    answered = store.leave("回过的")
+    store.mark_seen([seen.id])
+    store.reply(answered.id, "嗯")
     real_now = store.now()
-    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=1))
-    assert [x["id"] for x in client.get("/k/api/today").json()["messages"]] == [unread.id]
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=3))
+    assert {x["id"] for x in client.get("/k/api/today").json()["messages"]} == {seen.id, unread.id}
 
 
 def test_only_messages_take_replies(env):
