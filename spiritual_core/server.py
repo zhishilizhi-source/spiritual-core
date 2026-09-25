@@ -52,6 +52,19 @@ def _lines(records: list[Record], empty: str) -> str:
     return "\n".join(_line(r) for r in records) if records else empty
 
 
+def _compact(records: list[Record], empty: str) -> str:
+    """Titles, but photos and transcripts only counted: they are many and read on demand."""
+    shown = [r for r in records if r.kind not in ("image", "raw")]
+    photos = [r for r in records if r.kind == "image"]
+    raws = [r for r in records if r.kind == "raw"]
+    lines = [_line(r) for r in shown]
+    if photos:
+        lines.append(f"照片 {len(photos)} 张（timeline 看得到）")
+    if raws:
+        lines.append("原文：" + "、".join(f"[{r.id}] {r.event_date}" for r in raws))
+    return "\n".join(lines) or empty
+
+
 def load_secret(data_dir: Path) -> str:
     secret = os.environ.get("SC_SECRET", "").strip()
     if secret:
@@ -91,11 +104,16 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
 
     @mcp.tool()
     @guarded
-    def wake() -> str:
-        """开窗用：一次拉齐昨天+今天的记录标题、最新一份交接、钉住的记录、没做完的计划。只给标题。"""
-        w = store.wake()
+    def wake(since: str = "") -> str:
+        """开窗用：一次拉齐昨天+今天的记录标题、最新一份交接、钉住的记录、没做完的计划。只给标题。
+        同一个窗口里隔了一阵又醒（聊着聊着过了几小时），别整个重拉：
+        wake(since="上次 wake 第一行的时间，如 2026-09-25 11:47")，只给那之后新写的和她的心情、回复。
+        先读里的东西这个窗口读过就别再读。"""
         now = store.now()
         head = f"现在 {now:%Y-%m-%d %H:%M}（{store.tz.key}）"
+        if since.strip():
+            return _wake_since(since.strip(), head)
+        w = store.wake()
         if w["anniversaries"]:
             head += "\n" + "\n".join(w["anniversaries"])
         if w["mood"]:
@@ -105,17 +123,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         elif w["mood_yesterday"]:
             m = w["mood_yesterday"]
             head += f"\n她今天还没点心情；昨天最后是：{m['mood']}（{m['at'][11:16]}）"
-        parts = [
-            head,
-            "【昨天和今天】\n" + _lines(w["days"], "（这两天还没有记录）"),
-        ]
-        store.recycle_messages()
-        if (answered := store.answered()):
-            parts.append("【她回你的留言】\n" + "\n".join(
-                f"[{r.id}] 我：{r.title}\n    她（{r.replied_at[5:16].replace('T', ' ')}）：{r.reply}"
-                for r in answered))
-        if (unseen := store.unseen_messages()):
-            parts.append(f"你留的话还有 {unseen} 条她没点开。")
+        parts = [head, "【昨天和今天】\n" + _compact(w["days"], "（这两天还没有记录）")]
+        parts += _replies()
         if w["last_diary"]:
             parts.append("【最近一篇日记】（这两天没写，线接在这里）\n" + _lines(w["last_diary"], ""))
         parts += [
@@ -123,13 +132,18 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             "【钉住的】\n" + _lines(w["pinned"], "（没有钉住的）"),
             "【没做完的计划】\n" + _lines(w["plans"], "（没有挂着的计划）"),
         ]
-        if w["month_ago"]:
-            parts.append("【一个月前的今天】\n" + _lines(w["month_ago"], ""))
-        parts.append("【自己浮上来的】（分量最重的旧记忆）\n" + _lines(w["surfaced"], "（还没有）"))
-        first = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
-        # what's pinned is read every time, before the day's diary
-        first = ([r.id for r in w["pinned"]] + [r.id for r in first]
-                 + [r.id for r in w["handoff"]])
+        # a month ago and what floats up: only the heaviest two, titles are enough to go on
+        month = [r for r in w["month_ago"] if r.kind not in ("raw", "image")]
+        if month:
+            wm = store.weigh(month)
+            month.sort(key=lambda r: wm[r.id][0], reverse=True)
+            parts.append("【一个月前的今天】\n" + _lines(month[:2], ""))
+        parts.append("【自己浮上来的】（分量最重的旧记忆）\n" + _lines(w["surfaced"][:2], "（还没有）"))
+        # 先读 stays short: what's pinned, the newest diary, and a handoff only if it is newer
+        diaries = [r for r in w["days"] if r.kind == "diary"] or w["last_diary"]
+        newest = max(diaries, key=lambda r: (r.event_date, r.created_at), default=None)
+        first = [r.id for r in w["pinned"]] + ([newest.id] if newest else [])
+        first += [h.id for h in w["handoff"] if newest is None or h.created_at > newest.created_at]
         tail = f"先读：{'、'.join(first)}" if first else ""
         if (n_locked := store.locked_count()):
             tail += ("\n" if tail else "") + f"你锁着 {n_locked} 条心里话（timeline/search 里标着 [锁着]）。"
@@ -137,6 +151,28 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
         if tail:
             parts.append(tail)
+        return "\n\n".join(parts)
+
+    def _replies() -> list[str]:
+        store.recycle_messages()
+        out = []
+        if (answered := store.answered()):
+            out.append("【她回你的留言】\n" + "\n".join(
+                f"[{r.id}] 我：{r.title}\n    她（{r.replied_at[5:16].replace('T', ' ')}）：{r.reply}"
+                for r in answered))
+        if (unseen := store.unseen_messages()):
+            out.append(f"你留的话还有 {unseen} 条她没点开。")
+        return out
+
+    def _wake_since(since: str, head: str) -> str:
+        m = store.mood_now()
+        if m:
+            head += f"\n她现在的心情：{m['mood']}（{m['at'][11:16]} 点的）"
+        stamp = since.replace(" ", "T")
+        rows = store.db.execute(
+            "SELECT * FROM records WHERE created_at > ? ORDER BY created_at", (stamp,)).fetchall()
+        fresh = [Record.from_row(r) for r in rows]
+        parts = [head, f"【{since} 之后新写的】\n" + _compact(fresh, "（没有新的）"), *_replies()]
         return "\n\n".join(parts)
 
     @mcp.tool()
@@ -188,12 +224,16 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             kept = [x for x in day if x.kind == "excerpt"]
             photos = [x for x in day if x.kind == "image"]
             raws = [x for x in day if x.kind == "raw"]
+            # only pointers: the day's excerpts in full made every read carry the same text again
+            more = []
             if kept:
-                extra.append("【当天节选】\n" + "\n\n".join(_excerpt(x) for x in kept))
+                more.append(f"节选 {len(kept)} 条（" + "、".join(x.id for x in kept) + "）")
             if photos:
-                extra.append("【当天照片】\n" + _lines(photos, ""))
+                more.append(f"照片 {len(photos)} 张")
             if raws:
-                extra.append("【当天原文】\n" + _lines(raws, ""))
+                more.append("原文 " + "、".join(x.id for x in raws))
+            if more:
+                extra.append("【当天还有】" + "；".join(more))
         return "\n\n".join([head, r.body, *extra])
 
     @mcp.tool()
