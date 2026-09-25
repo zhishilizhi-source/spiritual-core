@@ -159,13 +159,11 @@
   .msg { min-height: 22px; font-size: 14px; margin-top: 10px; text-align: center; }
   .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
   h2 { font-size: 15px; font-weight: 600; margin: 26px 0 10px; color: var(--muted); }
-  /* Folded shelves: closed on every load, so a screenshot shows only the heading. */
-  details.fold > summary { list-style: none; cursor: pointer; }
-  details.fold > summary::-webkit-details-marker { display: none; }
-  details.fold > summary h2 { display: flex; align-items: baseline; gap: 8px; }
-  details.fold > summary h2 .n { font-weight: 400; font-size: 12px; }
-  details.fold > summary h2::after { content: "点开看"; margin-left: auto; font-weight: 400; font-size: 12px; }
-  details.fold[open] > summary h2::after { content: "收起"; }
+  /* Frosted shelves: the shape of the words shows, the words don't, so a screenshot
+     still looks lived-in without giving anything away. Tap one to clear it. */
+  .veiled .body, .veiled .why, .veiled .her-reply { filter: blur(4.5px); user-select: none;
+                                                    transition: filter .2s; cursor: pointer; }
+  .veiled .shown .body, .veiled .shown .why, .veiled .shown .her-reply { filter: none; user-select: text; }
   .list { display: grid; gap: 10px; }
   .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
           padding: 12px; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
@@ -449,11 +447,9 @@
   </section>
 
   <section id="noteShelf" hidden>
-    <details class="fold">
-      <summary><h2>留给陆能的便签<span class="n" id="noteN"></span></h2></summary>
-      <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
-      <div id="noteList"></div>
-    </details>
+    <h2>留给陆能的便签</h2>
+    <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
+    <div id="noteList" class="veiled"></div>
   </section>
 
   <section id="browse" hidden>
@@ -495,10 +491,8 @@
   </form>
 
   <div id="recentBox">
-    <details class="fold">
-      <summary><h2>最近存的<span class="n" id="recentN"></span></h2></summary>
-      <div class="list" id="recent"></div>
-    </details>
+    <h2>最近存的</h2>
+    <div class="list veiled" id="recent"></div>
   </div>
 
 <script>
@@ -951,6 +945,12 @@
     } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
   }
 
+  // Frosted shelves: tapping the words clears that one item; tapping again frosts it back.
+  document.querySelectorAll(".veiled").forEach((shelf) => shelf.addEventListener("click", (ev) => {
+    if (!ev.target.closest(".body, .why, .her-reply")) return;
+    ev.target.closest(".item, .note-item")?.classList.toggle("shown");
+  }));
+
   // Her notes still out. The shelf only shows when there is one.
   async function loadNotes() {
     try {
@@ -959,7 +959,6 @@
         <div class="body">${esc(n.body)}</div>
         <div class="meta">${when(n.created_at)} · ${n.reply ? "他回了" : n.seen_at ? "他读过了" : "他还没读"}</div>
         ${n.reply ? `<div class="her-reply"><span>他回</span>${esc(n.reply)}</div>` : ""}</div>`).join("");
-      $("#noteN").textContent = items.length ? `${items.length} 张` : "";
       $("#noteShelf").hidden = !items.length || $("#write").hidden;
     } catch { $("#noteShelf").hidden = true; }
   }
@@ -1273,7 +1272,6 @@
   async function loadRecent() {
     try {
       const { items } = await (await fetch("api/recent")).json();
-      $("#recentN").textContent = items.length ? `${items.length} 条` : "";
       $("#recent").innerHTML = items.length ? items.map((it) => it.sealed
         ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 心里话</div>
              <div class="body">陆能锁了一条心里话</div></div></div>`
