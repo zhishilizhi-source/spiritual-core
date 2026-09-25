@@ -159,11 +159,6 @@
   .msg { min-height: 22px; font-size: 14px; margin-top: 10px; text-align: center; }
   .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
   h2 { font-size: 15px; font-weight: 600; margin: 26px 0 10px; color: var(--muted); }
-  /* Frosted shelves: the shape of the words shows, the words don't, so a screenshot
-     still looks lived-in without giving anything away. Tap one to clear it. */
-  .veiled .body, .veiled .why, .veiled .her-reply { filter: blur(4.5px); user-select: none;
-                                                    transition: filter .2s; cursor: pointer; }
-  .veiled .shown .body, .veiled .shown .why, .veiled .shown .her-reply { filter: none; user-select: text; }
   .list { display: grid; gap: 10px; }
   .item { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
           padding: 12px; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
@@ -449,7 +444,7 @@
   <section id="noteShelf" hidden>
     <h2>留给陆能的便签</h2>
     <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
-    <div id="noteList" class="veiled"></div>
+    <div id="noteList"></div>
   </section>
 
   <section id="browse" hidden>
@@ -492,7 +487,7 @@
 
   <div id="recentBox">
     <h2>最近存的</h2>
-    <div class="list veiled" id="recent"></div>
+    <div id="recent"></div>
   </div>
 
 <script>
@@ -936,6 +931,8 @@
   }
   $("#shelf").addEventListener("click", shelfClick);
   $("#innerList").addEventListener("click", shelfClick);
+  $("#recent").addEventListener("click", shelfClick);
+  $("#noteList").addEventListener("click", shelfClick);
 
   async function loadInner() {
     try {
@@ -945,20 +942,16 @@
     } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
   }
 
-  // Frosted shelves: tapping the words clears that one item; tapping again frosts it back.
-  document.querySelectorAll(".veiled").forEach((shelf) => shelf.addEventListener("click", (ev) => {
-    if (!ev.target.closest(".body, .why, .her-reply")) return;
-    ev.target.closest(".item, .note-item")?.classList.toggle("shown");
-  }));
-
   // Her notes still out. The shelf only shows when there is one.
   async function loadNotes() {
     try {
       const { items } = await (await fetch("api/notes")).json();
-      $("#noteList").innerHTML = items.map((n) => `<div class="note-item">
-        <div class="body">${esc(n.body)}</div>
-        <div class="meta">${when(n.created_at)} · ${n.reply ? "他回了" : n.seen_at ? "他读过了" : "他还没读"}</div>
-        ${n.reply ? `<div class="her-reply"><span>他回</span>${esc(n.reply)}</div>` : ""}</div>`).join("");
+      $("#noteList").innerHTML = items.map((n) => `<details class="rec"><summary><span class="kind">便签</span>
+        <span class="t">${esc(n.title)}</span><span class="aside">${n.reply ? "他回了" : n.seen_at ? "他读过了" : "他还没读"}</span></summary>
+        <div class="full"><div class="body">${esc(n.body)}</div>
+        <div class="meta" style="margin-top:8px">${when(n.created_at)}</div>
+        ${n.reply ? `<div class="her-reply"><span>他回</span>${esc(n.reply)}</div>` : ""}
+        <div class="close-wrap"><button type="button" class="close">收起</button></div></div></details>`).join("");
       $("#noteShelf").hidden = !items.length || $("#write").hidden;
     } catch { $("#noteShelf").hidden = true; }
   }
@@ -1272,22 +1265,9 @@
   async function loadRecent() {
     try {
       const { items } = await (await fetch("api/recent")).json();
-      $("#recent").innerHTML = items.length ? items.map((it) => it.sealed
-        ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 心里话</div>
-             <div class="body">陆能锁了一条心里话</div></div></div>`
-        : it.kind === "image" && it.images && it.images.length > 1
-        ? `<div class="item text"><div><div class="meta">${esc(it.event_date)} · 照片 · ${it.images.length} 张</div>
-             <div class="strip">${it.images.slice(0, 5).map((id) => `<a href="img/${esc(id)}" target="_blank" rel="noopener"><img src="img/${esc(id)}?size=thumb" alt="" loading="lazy"></a>`).join("")}${it.images.length > 5 ? `<span class="more-n">+${it.images.length - 5}</span>` : ""}</div>
-             ${it.body && it.body !== "（没写说明）" ? `<div class="body">${esc(it.body)}</div>` : ""}</div></div>`
-        : it.kind === "image"
-        ? `<div class="item"><a href="img/${esc(it.id)}" target="_blank" rel="noopener">
-             <img src="img/${esc(it.id)}?size=thumb" alt="" loading="lazy"></a>
-             <div><div class="meta">${esc(it.event_date)} · 照片</div>
-             <div class="body">${esc(it.body)}</div></div></div>`
-        : `<div class="item text"><div><div class="meta">${esc(it.event_date)} · ${esc(KIND_NAME[it.kind] || it.kind)}${it.kept_by ? " · " + esc(it.kept_by) : ""}</div>
-             <div class="body">${esc(it.body)}</div>
-             ${it.why ? `<div class="why">为什么：${esc(it.why)}</div>` : ""}</div></div>`
-      ).join("") : `<div class="meta">还什么都没有。</div>`;
+      // One titled row each, like 翻看: the title says enough, the words wait inside.
+      $("#recent").innerHTML = items.length ? items.map((it) => recHtml(it, "", md(it.event_date))).join("")
+        : `<div class="meta">还什么都没有。</div>`;
     } catch { $("#recent").innerHTML = `<div class="meta">最近的没拉下来。</div>`; }
   }
   loadRecent();
