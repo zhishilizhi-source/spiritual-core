@@ -947,7 +947,7 @@
     try {
       const { items } = await (await fetch("api/notes")).json();
       $("#noteList").innerHTML = items.map((n) => `<details class="rec"><summary><span class="kind">便签</span>
-        <span class="t">${esc(n.title)}</span><span class="aside">${n.reply ? "他回了" : n.seen_at ? "他读过了" : "他还没读"}</span></summary>
+        <span class="t">${esc(n.title)}</span>${n.reply ? `<span class="layer new">回了</span>` : `<span class="layer">${n.seen_at ? "读过" : "未读"}</span>`}</summary>
         <div class="full"><div class="body">${esc(n.body)}</div>
         <div class="meta" style="margin-top:8px">${when(n.created_at)}</div>
         ${n.reply ? `<div class="her-reply"><span>他回</span>${esc(n.reply)}</div>` : ""}
