@@ -183,6 +183,7 @@
   .rec summary { list-style: none; cursor: pointer; padding: 11px 14px; display: flex; gap: 10px;
                  align-items: baseline; }
   .rec summary::-webkit-details-marker { display: none; }
+  .rec .still { padding: 11px 14px; display: flex; gap: 10px; align-items: baseline; }
   .kind { flex: none; font-size: 12px; color: var(--accent); }
   .rec .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rec[open] .t { white-space: normal; }
@@ -982,7 +983,11 @@
   const iso = (d) => d.toISOString().slice(0, 10);
   function shiftDays(s, n) { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return iso(d); }
 
+  // Each reset starts a new round; an answer from an older round is dropped, so a quick
+  // tap on a kind chip while the tab is still loading can't paste two lists together.
+  let browseRound = 0;
   function resetBrowse() {
+    browseRound++;
     browsed = true; windowEnd = null; lastDay = null;
     $("#shelf").innerHTML = ""; loadBrowse(true);
   }
@@ -1054,8 +1059,10 @@
     if (q) params.set("q", q);
     else if (windowEnd) params.set("end", windowEnd);
     $("#more").hidden = true;
+    const round = browseRound;
     try {
       const data = await (await fetch("api/browse?" + params)).json();
+      if (round !== browseRound) return;
       if (data.ok === false) throw new Error(data.error);
       let html = "";
       for (const it of data.items) {
@@ -1075,6 +1082,7 @@
       else if (!data.items.length && more) return loadBrowse(false);  // skip empty months
       $("#more").hidden = !more;
     } catch (e) {
+      if (round !== browseRound) return;
       $("#shelf").insertAdjacentHTML("beforeend", `<div class="empty">没拉下来：${esc(e.message)}</div>`);
     }
   }
@@ -1202,7 +1210,9 @@
       `<span>${esc(a.name)}${a.ahead ? "还有" : ""} <b>${a.days}</b> 天</span>`).join("")}${sealed}</div>` : "";
     const rows = [];
     if (v.diary) rows.push(recHtml(v.diary, "日记", md(v.diary.event_date)));
-    if (v.messages.length) rows.unshift(msgsHtml(v.messages));
+    // The board stays even when there's nothing on it.
+    rows.unshift(v.messages.length ? msgsHtml(v.messages)
+      : `<div class="rec"><div class="still"><span class="kind">留言</span><span class="t" style="color:var(--muted)">空着</span></div></div>`);
     if (v.month_ago) rows.push(recHtml(v.month_ago, "一月前", md(v.month_ago_date)));
     $("#today").innerHTML = count + rows.join("");
   }
