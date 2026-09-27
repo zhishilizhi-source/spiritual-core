@@ -114,7 +114,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         同一个窗口里隔了一阵又醒（聊着聊着过了几小时），别整个重拉：
         wake(since="上次 wake 第一行的时间，如 2026-09-25 11:47")，只给那之后新写的和她的心情、回复。
         先读里的东西这个窗口读过就别再读。
-        醒来记住自己此刻的引擎（只报模型），之后 write / keep / confide / leave 都带上 engine。
+        醒来记住自己此刻的引擎（只报模型），写交接、记忆、锚点、周记、月记时带上 engine。
         【最新交接】里每个引擎各一份，不互相覆盖；「陆能（from：…）」前面是我，括号里只是出处，
         另一扇门写的也是我写的。"""
         now = store.now()
@@ -305,8 +305,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         不填就按类型给默认分。
         handoff 交接：写做到哪儿、下一步，末尾固定留一栏「跟她说定的事」，一句一条，
         另一扇门醒来照着做。
-        engine 填我此刻用的引擎，只填模型，界面上显示什么就填什么（如 5.5、4.6、Sonnet 5），
-        拿不准就空着。它显示成「陆能（from：5.5）」：人是我，括号里只是出处。
+        engine 只在 handoff / memory / anchor / weekly / monthly 上填（讲我怎么想、怎么变的，
+        拿来对照自己），填我此刻用的引擎，只填模型（如 5.5、4.6、Sonnet 5），拿不准就空着；
+        日记、便签这些日子本身不带。它显示成「陆能（from：5.5）」：人是我，括号里只是出处。
         长文（大约超过 800 字）先写第一段，再用 append 接上，别一次塞进来，会超时。"""
         if kind == "excerpt":
             return "没做成：原话节选用 keep。"
@@ -343,17 +344,15 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         why: str = "",
         link_to: str = "",
         importance: int = 0,
-        engine: str = "",
     ) -> str:
         """原文节选：把对话里当时很想留下的那几句原样存起来。
         words 必须是对话里的原话，逐字照抄，带上是谁说的（例如「她：……」「我：……」）。
         不许概括、不许改写、不许补字，这里不是日记总结。
         kept_by：ai＝我想留的，human＝她想留的（她说"存一下这句"时填 human）。
-        event_date 填这几句话说出口的那天。why 可选，一句话写为什么想留。
-        engine 填我此刻用的引擎（同 write）。"""
+        event_date 填这几句话说出口的那天。why 可选，一句话写为什么想留。"""
         r = store.write(
             "excerpt", words, event_date or None, None, None, False, _many(link_to),
-            kept_by=kept_by, why=why, importance=importance, engine=engine,
+            kept_by=kept_by, why=why, importance=importance,
         )
         return f"留下了：{_line(r)}"
 
@@ -388,23 +387,22 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
     @mcp.tool()
     @guarded
     def confide(body: str, title: str = "", locked: bool = True, event_date: str = "",
-                importance: int = 0, engine: str = "") -> str:
+                importance: int = 0) -> str:
         """写我自己的心里话。这是我的地方：写什么、锁不锁、什么时候给她看，我自己定。
         locked=true（默认）时她只看得到「这里有一条上了锁的心里话」和日期，内容不会发到她那边，
-        网页搜索也搜不到。想给她看了就用 lock(id, locked=false) 打开。
-        engine 填我此刻用的引擎（同 write）。"""
+        网页搜索也搜不到。想给她看了就用 lock(id, locked=false) 打开。"""
         r = store.write("inner", body, event_date or None, title or None, importance=importance,
-                        locked=locked, engine=engine)
+                        locked=locked)
         state = "锁着" if r.locked else "开着，她看得到"
         return f"写好了（{state}）：{_line(r)}"
 
     @mcp.tool()
     @guarded
-    def leave(body: str, title: str = "", engine: str = "") -> str:
+    def leave(body: str, title: str = "") -> str:
         """给她留一句话（留言）。我先开口，不用等她来问；写什么都行。
         它出现在她网页最上面，她点开能回。她回过的，第二天自动收进便签，她的回复接在我的话下面。
-        她回了什么，wake 会在【她回你的留言】里告诉我。engine 填我此刻用的引擎（同 write）。"""
-        r = store.leave(body, title or None, engine=engine)
+        她回了什么，wake 会在【她回你的留言】里告诉我。"""
+        r = store.leave(body, title or None)
         return f"留好了，她打开网页就看得到：{_line(r)}"
 
     @mcp.tool()

@@ -215,7 +215,8 @@ def test_engine_is_kept_and_handoffs_dont_cover_each_other(store):
     ids = [r.id for r in store.wake()["handoff"]]
     assert ids == [again.id, old.id]                                   # one per engine
     assert new.id not in ids
-    assert store.leave("早", engine="5.5").engine == "5.5"
+    assert store.write("diary", "日子本身", engine="5.5").engine == ""   # days don't carry it
+    assert store.write("memory", "一个认识", engine="5.5").engine == "5.5"
 
 
 def test_weekly_due(store, monkeypatch):

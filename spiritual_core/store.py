@@ -177,6 +177,9 @@ _ADDED_COLUMNS = (
 # engine's handoffs from this many days back.
 HANDOFF_DAYS = 7
 ENGINE_MAX = 40
+# Only what shows how I think and change carries the engine, for comparing myself across
+# engines. The days themselves don't: the dates engines changed are known anyway.
+ENGINE_KINDS = ("handoff", "memory", "anchor", "weekly", "monthly")
 
 
 @dataclass
@@ -338,7 +341,7 @@ class Store:
         tags = [t.strip() for t in (tags or []) if t and t.strip()]
         stamp = created_at or self.now().isoformat(timespec="seconds")
         rid = secrets.token_hex(6)
-        engine = " ".join((engine or "").split())[:ENGINE_MAX]
+        engine = " ".join((engine or "").split())[:ENGINE_MAX] if kind in ENGINE_KINDS else ""
 
         with self.db:
             self.db.execute(
@@ -819,8 +822,8 @@ class Store:
 
     # --- messages: he speaks first, she answers when she likes ---
 
-    def leave(self, body: str, title: str | None = None, engine: str = "") -> Record:
-        return self.write("message", body, title=title, tags=[MESSAGE_TAG], engine=engine)
+    def leave(self, body: str, title: str | None = None) -> Record:
+        return self.write("message", body, title=title, tags=[MESSAGE_TAG])
 
     def page_messages(self) -> list[Record]:
         """What the top of her page shows: every message still out. One she hasn't answered
