@@ -14,14 +14,14 @@ import math
 from datetime import date
 
 KIND_DEFAULT = {
-    "anchor": 5, "excerpt": 4, "letter": 4, "intimate": 4, "inner": 4,
+    "anchor": 5, "excerpt": 4, "weekly": 4, "monthly": 4, "letter": 4, "intimate": 4, "inner": 4,
     "diary": 3, "memory": 3, "handoff": 3, "image": 3, "plan": 3,
     "raw": 2, "daily": 2, "work": 2, "note": 1,
 }
 
 # Days for recency to halve. None = never fades: what we agreed to keep does not sink with time.
 HALF_LIFE = {
-    "anchor": None, "excerpt": None, "letter": None, "intimate": None, "inner": None,
+    "anchor": None, "excerpt": None, "monthly": None, "weekly": 365, "letter": None, "intimate": None, "inner": None,
     "diary": 180, "memory": 180, "image": 180, "raw": 90, "daily": 60, "work": 45,
     "plan": 30, "note": 21, "handoff": 14,
 }

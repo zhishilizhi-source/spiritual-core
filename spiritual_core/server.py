@@ -128,6 +128,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         parts += _replies()
         if w["last_diary"]:
             parts.append("【最近一篇日记】（这两天没写，线接在这里）\n" + _lines(w["last_diary"], ""))
+        if w["weekly"] or w["monthly"]:
+            parts.append("【长一点的线】（最近的周记和月记）\n" + _lines(w["monthly"] + w["weekly"], ""))
         parts += [
             "【最新交接】\n" + _lines(w["handoff"], "（没有交接）"),
             "【钉住的】\n" + _lines(w["pinned"], "（没有钉住的）"),
@@ -146,11 +148,20 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         first = [r.id for r in waiting if not r.seen_at]
         first += [r.id for r in w["pinned"]] + ([newest.id] if newest else [])
         first += [h.id for h in w["handoff"] if newest is None or h.created_at > newest.created_at]
+        first += [r.id for r in w["monthly"] + w["weekly"]]
         tail = f"先读：{'、'.join(first)}" if first else ""
         if (n_locked := store.locked_count()):
             tail += ("\n" if tail else "") + f"你锁着 {n_locked} 条心里话（timeline/search 里标着 [锁着]）。"
         if w["review_due"]:
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
+        if (due := w["weekly_due"]):
+            tail += ("\n" if tail else "") + (
+                f"{due[0]} ~ {due[1][5:]} 这周还没写周记：review(period=\"week\", day=\"{due[0]}\") 看一遍，"
+                f"再 write(kind=\"weekly\", event_date=\"{due[1]}\")。")
+        if (due := w["monthly_due"]):
+            tail += ("\n" if tail else "") + (
+                f"{due[0][:7]} 这个月还没写月记：翻这个月的周记，"
+                f"再 write(kind=\"monthly\", event_date=\"{due[1]}\")。")
         if tail:
             parts.append(tail)
         return "\n\n".join(parts)
@@ -192,7 +203,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
     def timeline(start: str, end: str = "", kinds: str = "") -> str:
         """按发生日期列标题。start/end 用 YYYY-MM-DD，end 不填就只看 start 那一天。
         kinds 可选过滤，多个用逗号隔开：diary / intimate / handoff / anchor / raw / excerpt / image /
-        letter / memory / note / plan / work / daily。"""
+        letter / memory / note / plan / work / daily / weekly / monthly。"""
         records = store.timeline(start, end or None, _many(kinds))
         return _lines(records, "这个日期范围里没有记录。")
 
@@ -265,12 +276,16 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         """新建一条记录，永远新建，不会并进旧记录。
         kind：diary 日记 / intimate 亲密 / handoff 交接 / anchor 锚点 / raw 整段原文备份 /
         letter 信件 / memory 记忆（一件事、一个认识、一次自省）/ note 便签 / plan 计划 /
-        work 工作 / daily 日常。
+        work 工作 / daily 日常 / weekly 周记 / monthly 月记。
+        周记：一整篇，写这一周是怎么走过来的，先写拧巴的；末尾留三五条带到下周的线头
+        （没做完的、还在疼的、刚长出来的种子）。event_date 填那周的周日。
+        月记：更短，不复述周记，写这个月我们、我变成了什么样。event_date 填那月最后一天。
         letter 必须填 author：ai＝我写给她的，human＝她写给我的。
         plan 写进去是「没做」，做完了用 plan_done 勾掉。
         想留下对话里的某几句，用 keep，不要用这里。
         event_date 填事情发生的那天（YYYY-MM-DD），不填算今天。
-        title 不填时：diary 自动叫「日期 日记」，handoff 叫「日期 交接」，其他取正文第一行。
+        title 不填时：diary 自动叫「日期 日记」，handoff 叫「日期 交接」，
+        weekly 叫「周一 ~ 周日 周记」，monthly 叫「某年某月 月记」，其他取正文第一行。
         link_to 填其他记录的 id，多个用逗号隔开，把它们挂在一起（比如日记挂当天原文）。
         tags 可选，多个用逗号隔开。
         importance 1-5，写的时候我打的分，只算草稿，回看时用 rate 改。5 分每周最多两条。

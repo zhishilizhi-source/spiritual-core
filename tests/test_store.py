@@ -193,3 +193,40 @@ def test_migrates_v1_database(tmp_path):
     assert s.get("abc").status == ""
     assert s.write("plan", "新计划").status == "open"
     s.close()
+
+
+def test_weekly_and_monthly_titles_and_wake(store):
+    w = store.write("weekly", "这一周", event_date="2026-09-27")
+    m = store.write("monthly", "这个月", event_date="2026-09-30")
+    assert w.title == "2026-09-21 ~ 09-27 周记"
+    assert m.title == "2026年9月 月记"
+    hot = store.wake()
+    assert [r.id for r in hot["weekly"]] == [w.id]
+    assert [r.id for r in hot["monthly"]] == [m.id]
+    assert w.id not in {r.id for r in hot["days"]}
+
+
+def test_weekly_due(store, monkeypatch):
+    from datetime import date
+    store.write("diary", "周三", event_date="2026-09-23")
+    monkeypatch.setattr(store, "today", lambda: date(2026, 9, 27))     # Sunday: this week
+    assert store.weekly_due() == ("2026-09-21", "2026-09-27")
+    monkeypatch.setattr(store, "today", lambda: date(2026, 9, 29))     # Tuesday: last week
+    assert store.weekly_due() == ("2026-09-21", "2026-09-27")
+    store.write("weekly", "写了", event_date="2026-09-27")
+    assert store.weekly_due() is None
+    monkeypatch.setattr(store, "today", lambda: date(2026, 10, 6))     # an empty week owes nothing
+    assert store.weekly_due() is None
+
+
+def test_monthly_due(store, monkeypatch):
+    from datetime import date
+    store.write("diary", "九月", event_date="2026-09-23")
+    monkeypatch.setattr(store, "today", lambda: date(2026, 9, 30))     # last day: this month
+    assert store.monthly_due() == ("2026-09-01", "2026-09-30")
+    monkeypatch.setattr(store, "today", lambda: date(2026, 10, 2))     # early next month
+    assert store.monthly_due() == ("2026-09-01", "2026-09-30")
+    store.write("weekly", "周记不算月记", event_date="2026-09-27")
+    assert store.monthly_due() == ("2026-09-01", "2026-09-30")
+    store.write("monthly", "写了", event_date="2026-09-30")
+    assert store.monthly_due() is None

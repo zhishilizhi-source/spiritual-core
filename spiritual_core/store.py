@@ -23,7 +23,12 @@ from . import media, weight
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
     "letter", "memory", "note", "plan", "work", "daily", "inner", "message",
+    "weekly", "monthly",
 )
+
+# Short-term memory is yesterday and today; long-term is the weekly and the monthly.
+# event_date of a weekly is any day in its ISO week, of a monthly any day in its month.
+DIGESTS = ("weekly", "monthly")
 
 # `message` is the AI speaking first: a line left for her on the page. She can answer it;
 # a day after she answers, it is filed away as a note with her answer under it.
@@ -926,6 +931,32 @@ class Store:
         ).fetchone()
         return bool(has_last_week) and not reviewed_lately
 
+    def weekly_due(self) -> tuple[str, str] | None:
+        """The week a weekly is owed for: this week on Sunday, otherwise last week.
+        Owed only when that week has records and no weekly yet."""
+        today = self.today()
+        day = today if today.weekday() == 6 else today - timedelta(days=7)
+        return self._digest_due("weekly", *weight.iso_week(day.isoformat()))
+
+    def monthly_due(self) -> tuple[str, str] | None:
+        """The month a monthly is owed for: this month on its last day, otherwise last month."""
+        today = self.today()
+        start, end = weight.month(today.isoformat())
+        if today.isoformat() != end:
+            start, end = weight.month((date.fromisoformat(start) - timedelta(days=1)).isoformat())
+        return self._digest_due("monthly", start, end)
+
+    def _digest_due(self, kind: str, start: str, end: str) -> tuple[str, str] | None:
+        lived = self.db.execute(
+            "SELECT 1 FROM records WHERE event_date BETWEEN ? AND ? AND kind NOT IN (?, ?) LIMIT 1",
+            (start, end, *DIGESTS),
+        ).fetchone()
+        written = self.db.execute(
+            "SELECT 1 FROM records WHERE kind=? AND event_date BETWEEN ? AND ? LIMIT 1",
+            (kind, start, end),
+        ).fetchone()
+        return (start, end) if lived and not written else None
+
     # --- moods ---
 
     def set_mood(self, mood: str, note: str = "") -> dict:
@@ -1007,7 +1038,11 @@ class Store:
             "handoff": handoff,
             "pinned": self.pinned(),
             "plans": self.open_plans(),
+            "weekly": self.latest("weekly", 1),
+            "monthly": self.latest("monthly", 1),
         }
+        digest_ids = {r.id for r in hot["weekly"] + hot["monthly"]}
+        hot["days"] = [r for r in hot["days"] if r.id not in digest_ids]
         # No diary yesterday or today: point at the newest one so the thread isn't lost.
         hot["last_diary"] = []
         if not any(r.kind == "diary" for r in hot["days"]):
@@ -1024,6 +1059,8 @@ class Store:
             (m for m in reversed(log) if m["day"] == yesterday.isoformat()), None
         )
         hot["review_due"] = self.review_due()
+        hot["weekly_due"] = self.weekly_due()
+        hot["monthly_due"] = self.monthly_due()
         return hot
 
 
@@ -1057,5 +1094,11 @@ def _default_title(kind: str, event_date: str, body: str) -> str:
         return f"{event_date} 日记"
     if kind == "handoff":
         return f"{event_date} 交接"
+    if kind == "weekly":
+        start, end = weight.iso_week(event_date)
+        return f"{start} ~ {end[5:]} 周记"
+    if kind == "monthly":
+        d = date.fromisoformat(event_date)
+        return f"{d.year}年{d.month}月 月记"
     first = body.strip().splitlines()[0].strip()
     return first[:40] + ("…" if len(first) > 40 else "")
