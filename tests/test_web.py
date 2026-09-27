@@ -237,3 +237,11 @@ def test_only_her_notes_take_his_answer(env):
             store.answer_note(r.id, "嗯")
     with pytest.raises(StoreError):
         store.write("memory", "x", kept_by="human")
+
+
+def test_recent_shows_digests_and_handoffs(env):
+    store, client = env
+    w = store.write("weekly", "一周", event_date="2026-09-27")
+    h = store.write("handoff", "做到这儿")
+    ids = {i["id"] for i in client.get("/k/api/recent").json()["items"]}
+    assert {w.id, h.id} <= ids

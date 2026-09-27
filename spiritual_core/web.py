@@ -210,7 +210,7 @@ def mount(mcp, store: Store, secret: str) -> None:
 
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
-        kinds = ["image", "excerpt", "inner", *PAGE_KINDS]
+        kinds = ["image", "excerpt", "inner", "weekly", "monthly", "handoff", *PAGE_KINDS]
         items = _group([_item(r) for r in store.recent(kinds, 100)], store)
         return JSONResponse({"items": items[:30]})
 
