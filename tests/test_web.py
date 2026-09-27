@@ -160,7 +160,7 @@ def test_message_reply_then_filed_as_note_next_day(env, monkeypatch):
     assert [x.id for x in store.answered()] == [m.id]
 
 
-def test_unanswered_messages_stay_on_the_page_until_answered(env, monkeypatch):
+def test_read_but_unanswered_messages_leave_the_board_after_three_days(env, monkeypatch):
     from datetime import timedelta
     store, client = env
     seen = store.leave("她看过没回的")
@@ -169,8 +169,14 @@ def test_unanswered_messages_stay_on_the_page_until_answered(env, monkeypatch):
     store.mark_seen([seen.id])
     store.reply(answered.id, "嗯")
     real_now = store.now()
-    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=3))
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=2))
     assert {x["id"] for x in client.get("/k/api/today").json()["messages"]} == {seen.id, unread.id}
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=3))
+    assert {x["id"] for x in client.get("/k/api/today").json()["messages"]} == {unread.id}
+    rec = store.get(seen.id)
+    assert rec.kind == "note" and rec.body.startswith("她看过没回的") and "多多读过" in rec.body
+    assert seen.id not in {x.id for x in store.answered()}
+    assert store.recycle_messages() == 0                              # filed once, not again
 
 
 def test_only_messages_take_replies(env):

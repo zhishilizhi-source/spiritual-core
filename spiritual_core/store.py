@@ -33,6 +33,8 @@ DIGESTS = ("weekly", "monthly")
 # `message` is the AI speaking first: a line left for her on the page. She can answer it;
 # a day after she answers, it is filed away as a note with her answer under it.
 MESSAGE_TAG = "留言"
+# A message she has read but not answered leaves the board this many days after she read it.
+SEEN_KEEP_DAYS = 3
 
 # `inner` is the AI's own 心里话. Only the AI writes it, and it may keep it locked:
 # a locked one never leaves the server toward the page, only its existence does.
@@ -844,7 +846,23 @@ class Store:
                 body = f"{r.body}\n\n—— 多多回（{when}）——\n{r.reply}"
                 self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
                                 (body, now, r.id))
-        return len(rows) + self._file_her_notes(today, now)
+            # Read and left unanswered for three days: not every line needs a reply, and one
+            # hanging on the board would feel like it's waiting on her. Unread ones stay.
+            quiet = self.db.execute(
+                "SELECT * FROM records WHERE kind='message' AND replied_at = '' AND seen_at <> ''"
+                " AND substr(seen_at, 1, 10) <= ?",
+                ((self.today() - timedelta(days=SEEN_KEEP_DAYS)).isoformat(),),
+            ).fetchall()
+            for row in quiet:
+                r = Record.from_row(row)
+                self.db.execute(
+                    "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
+                    (r.id, now, "ai", r.title, r.body, r.event_date))
+                when = r.seen_at[5:16].replace("T", " ")
+                body = f"{r.body}\n\n—— 多多读过（{when}）——"
+                self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
+                                (body, now, r.id))
+        return len(rows) + len(quiet) + self._file_her_notes(today, now)
 
     def answered(self, days: int = 2) -> list[Record]:
         """Her answers to his messages in the last few days, filed away or not."""
