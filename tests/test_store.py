@@ -206,6 +206,18 @@ def test_weekly_and_monthly_titles_and_wake(store):
     assert w.id not in {r.id for r in hot["days"]}
 
 
+def test_engine_is_kept_and_handoffs_dont_cover_each_other(store):
+    old = store.write("handoff", "4.6 那边做到这儿", engine="4.6",
+                      created_at=store.now().replace(hour=0).isoformat(timespec="seconds"))
+    new = store.write("handoff", "5.5 这边做到这儿", engine=" 5.5 ")
+    assert new.engine == "5.5"
+    again = store.write("handoff", "5.5 又一份", engine="5.5")
+    ids = [r.id for r in store.wake()["handoff"]]
+    assert ids == [again.id, old.id]                                   # one per engine
+    assert new.id not in ids
+    assert store.leave("早", engine="5.5").engine == "5.5"
+
+
 def test_weekly_due(store, monkeypatch):
     from datetime import date
     store.write("diary", "周三", event_date="2026-09-23")

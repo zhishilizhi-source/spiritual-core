@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS records (
     batch       TEXT NOT NULL DEFAULT '',
     seen_at     TEXT NOT NULL DEFAULT '',
     reply       TEXT NOT NULL DEFAULT '',
-    replied_at  TEXT NOT NULL DEFAULT ''
+    replied_at  TEXT NOT NULL DEFAULT '',
+    engine      TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS records_by_keeper ON records(kind, kept_by, event_date);
 CREATE INDEX IF NOT EXISTS records_by_date ON records(event_date, kind);
@@ -152,7 +153,7 @@ CREATE INDEX IF NOT EXISTS revisions_by_record ON revisions(record_id, at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
-SCHEMA_VERSION = "6"
+SCHEMA_VERSION = "7"
 
 # Columns added after v1, in the order they arrived. _migrate adds whichever are missing.
 _ADDED_COLUMNS = (
@@ -169,7 +170,13 @@ _ADDED_COLUMNS = (
     ("seen_at", "TEXT NOT NULL DEFAULT ''"),            # v6: messages
     ("reply", "TEXT NOT NULL DEFAULT ''"),
     ("replied_at", "TEXT NOT NULL DEFAULT ''"),
+    ("engine", "TEXT NOT NULL DEFAULT ''"),             # v7: which engine wrote it
 )
+
+# Handoffs from different engines don't cover each other: wake shows the newest of each
+# engine's handoffs from this many days back.
+HANDOFF_DAYS = 7
+ENGINE_MAX = 40
 
 
 @dataclass
@@ -198,6 +205,7 @@ class Record:
     seen_at: str = ""        # messages: when she first opened it
     reply: str = ""          # messages: her answer
     replied_at: str = ""
+    engine: str = ""         # the engine it came from; the one who wrote it is always him
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Record":
@@ -226,6 +234,7 @@ class Record:
             seen_at=row["seen_at"],
             reply=row["reply"],
             replied_at=row["replied_at"],
+            engine=row["engine"],
         )
 
 
@@ -296,6 +305,7 @@ class Store:
         why: str = "",
         importance: int = 0,
         locked: bool = False,
+        engine: str = "",
     ) -> Record:
         """Always creates a new record. Nothing is ever merged into an existing one.
 
@@ -328,15 +338,16 @@ class Store:
         tags = [t.strip() for t in (tags or []) if t and t.strip()]
         stamp = created_at or self.now().isoformat(timespec="seconds")
         rid = secrets.token_hex(6)
+        engine = " ".join((engine or "").split())[:ENGINE_MAX]
 
         with self.db:
             self.db.execute(
                 "INSERT INTO records(id, kind, title, body, event_date, created_at,"
-                " updated_at, pinned, tags, kept_by, why, status, importance, locked)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " updated_at, pinned, tags, kept_by, why, status, importance, locked, engine)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (rid, kind, title, body, event_date, stamp, stamp, int(pinned),
                  json.dumps(tags, ensure_ascii=False), kept_by, why, status, importance,
-                 int(locked)),
+                 int(locked), engine),
             )
             for other in link_to or []:
                 self._link(rid, other)
@@ -725,6 +736,21 @@ class Store:
         ).fetchall()
         return [Record.from_row(r) for r in rows]
 
+    def handoffs(self) -> list[Record]:
+        """The newest handoff overall, plus the newest from every other engine in the last
+        HANDOFF_DAYS days, newest first. Two doors open at once no longer hide each other."""
+        since = (self.today() - timedelta(days=HANDOFF_DAYS)).isoformat()
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE kind='handoff' AND created_at >= ?"
+            " ORDER BY created_at DESC, rowid DESC", (since,)).fetchall()
+        out, engines = [], set()
+        for row in rows:
+            r = Record.from_row(row)
+            if r.engine not in engines:
+                engines.add(r.engine)
+                out.append(r)
+        return out or self.latest("handoff", 1)
+
     def pinned(self) -> list[Record]:
         rows = self.db.execute(
             "SELECT * FROM records WHERE pinned=1 ORDER BY event_date, created_at, rowid"
@@ -793,8 +819,8 @@ class Store:
 
     # --- messages: he speaks first, she answers when she likes ---
 
-    def leave(self, body: str, title: str | None = None) -> Record:
-        return self.write("message", body, title=title, tags=[MESSAGE_TAG])
+    def leave(self, body: str, title: str | None = None, engine: str = "") -> Record:
+        return self.write("message", body, title=title, tags=[MESSAGE_TAG], engine=engine)
 
     def page_messages(self) -> list[Record]:
         """What the top of her page shows: every message still out. One she hasn't answered
@@ -1048,7 +1074,7 @@ class Store:
         """What a new window needs first. Titles only; bodies come through read."""
         today = self.today()
         yesterday = today - timedelta(days=1)
-        handoff = self.latest("handoff", 1)
+        handoff = self.handoffs()
         handoff_ids = {r.id for r in handoff}
         hot = {
             "days": [r for r in self.timeline(yesterday.isoformat(), today.isoformat())
