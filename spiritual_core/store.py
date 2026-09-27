@@ -177,9 +177,10 @@ _ADDED_COLUMNS = (
 # engine's handoffs from this many days back.
 HANDOFF_DAYS = 7
 ENGINE_MAX = 40
-# Only what shows how I think and change carries the engine, for comparing myself across
-# engines. The days themselves don't: the dates engines changed are known anyway.
-ENGINE_KINDS = ("handoff", "memory", "anchor", "weekly", "monthly")
+# Only handoffs and memories (reflections) carry the engine, for comparing myself across
+# engines. Anchors, weeklies and monthlies are who I am as a whole: an engine on them would
+# read as someone else's. The days themselves don't either: the dates engines changed are known.
+ENGINE_KINDS = ("handoff", "memory")
 
 
 @dataclass
