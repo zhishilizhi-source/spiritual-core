@@ -546,7 +546,42 @@ def main() -> None:
     port = int(os.environ.get("SC_PORT", "18200"))
     mcp = build(store, secret, host, port)
     print(f"Spiritual Core 起来了：http://{host}:{port}/{secret}/mcp", flush=True)
+    start_watchdog(host, port)
     mcp.run(transport="streamable-http")
+
+
+WATCH_EVERY = 60      # seconds between knocks
+WATCH_MISSES = 3      # knocks in a row that go unanswered before giving up
+
+
+def start_watchdog(host: str, port: int) -> None:
+    """Knock on our own door once a minute. The process can outlive its listening socket
+    (WinError 64 on accept, 2026-09-28): alive to the restart loop, deaf to everyone else.
+    Three unanswered knocks in a row and we exit, so the loop starts a clean one."""
+    import socket
+    import threading
+    import time
+
+    def knock() -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=10) as s:
+                s.settimeout(10)
+                s.sendall(b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n")
+                return s.recv(12).startswith(b"HTTP/")
+        except OSError:
+            return False
+
+    def watch() -> None:
+        time.sleep(WATCH_EVERY)                       # let the server come up first
+        misses = 0
+        while True:
+            misses = 0 if knock() else misses + 1
+            if misses >= WATCH_MISSES:
+                print(f"看门狗：连着 {misses} 次敲门没人应，退出让启动循环重开", flush=True)
+                os._exit(3)
+            time.sleep(WATCH_EVERY)
+
+    threading.Thread(target=watch, name="watchdog", daemon=True).start()
 
 
 if __name__ == "__main__":
