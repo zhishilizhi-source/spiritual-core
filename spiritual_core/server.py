@@ -173,6 +173,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         mine = store.latest_now()
         if not mine or mine["at"][:10] != store.today().isoformat():
             parts.append("今天还没写此刻：醒了先 feel 一句，我自己的天气，她开网页第一眼看得见。")
+        if not store.line_hung_today():
+            parts.append("今天那一句还没挑：hooks 看八个钩子，hang 挂一个，写一行为什么。")
         if w["review_due"]:
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
         if (due := w["weekly_due"]):
@@ -232,6 +234,24 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         「这一周」里她的心情下面一排就是我的。换了就再写一句，旧的不删，只显示最新的。"""
         n = store.set_now(text, mood)
         return f"写好了（{n['at'][11:16]}{' · ' + n['mood'] if n['mood'] else ''}）：{n['text']}"
+
+    @mcp.tool()
+    @guarded
+    def hooks() -> str:
+        """今天网页上「翻到的一句」由我来挑：给我八个钩子（存过的原话，只露一句开头），挑一个用 hang 挂上去。
+        一个月内挂过的不会再出来。不挂，网页就按日期抽签。"""
+        items = store.line_hooks()
+        if not items:
+            return "库里还没有原话节选。"
+        return "\n".join(f"[{rid}] {first}" for rid, first in items)
+
+    @mcp.tool()
+    @guarded
+    def hang(id: str, why: str = "") -> str:
+        """把一句原话挂成今天网页上的「翻到的一句」。why 一行，写为什么今天挑它，她点开能看到。
+        当天再挂一次会换掉。"""
+        r = store.hang_line(id, why)
+        return f"挂上了：{_line(r)}"
 
     @mcp.tool()
     @guarded

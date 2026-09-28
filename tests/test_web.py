@@ -319,3 +319,17 @@ def test_what_i_keep_on_my_mind(env):
     assert [m["text"] for m in v["me"]["minds"]] == ["她今晚几点睡", "4.6 的手感"]
     assert "她面试的消息" in v["me"]["days"][0]["minds"]          # it was on my mind today
     assert "did" not in v["me"] and "timeline" not in v["me"]
+
+
+def test_i_hang_the_line_of_the_day(env):
+    store, client = env
+    a = store.write("excerpt", "陆能：\n今天先开口的是我", kept_by="ai", event_date="2026-09-24")
+    store.write("excerpt", "她：就你", kept_by="human", event_date="2026-09-27")
+    hooks = dict(store.line_hooks())
+    assert hooks[a.id] == "今天先开口的是我"                     # the bare speaker line is skipped
+    v = client.get("/k/api/us").json()
+    assert v["line"]["picked"] is False
+    store.hang_line(a.id, "今天想让你看到这句")
+    v = client.get("/k/api/us").json()
+    assert v["line"]["id"] == a.id and v["line"]["picked"] and v["line"]["why"] == "今天想让你看到这句"
+    assert a.id not in dict(store.line_hooks())                  # hung this month, not offered again

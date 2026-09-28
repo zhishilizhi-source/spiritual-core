@@ -432,12 +432,12 @@ def us_view(store: Store) -> dict:
              "asleep": (store.health_night(d) or {}).get("asleep"),
              "diary": d.isoformat() in diaries} for d in days]
 
-    line = store.line_of_the_day()
+    line, why = store.line_of_the_day()
     return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "minds": store.open_minds(),
                                "days": me_days},
             "week": week,
             "line": {"id": line.id, "words": line.body, "kept_by": line.kept_by, "who": who_label(line),
-                     "event_date": line.event_date} if line else None}
+                     "event_date": line.event_date, "picked": store.line_hung_today(), "why": why} if line else None}
 
 
 def _err(msg: str) -> JSONResponse:

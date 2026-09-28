@@ -1553,8 +1553,9 @@
     // folded: one line; when the first line is only who's speaking ("陆能：", "她："), show the next
     const lines = l.words.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
     const peek = lines.length > 1 && /^.{1,6}[：:]$/.test(lines[0]) ? lines[1] : (lines[0] || "");
-    box.innerHTML = `<div class="card-h">今天翻到的一句</div><div class="peek">${esc(peek)}</div><div class="words">${esc(l.words.trim())}</div>`
-      + `<div class="meta">${esc(md(l.event_date))} · ${esc(l.who)}</div>`;
+    box.innerHTML = `<div class="card-h">${l.picked ? "陆能今天挑的一句" : "今天翻到的一句"}</div><div class="peek">${esc(peek)}</div><div class="words">${esc(l.words.trim())}</div>`
+      + `<div class="meta">${esc(md(l.event_date))} · ${esc(l.who)}${l.picked
+          ? ` · 陆能今天挑的${l.why ? `：${esc(l.why)}` : ""}` : " · 今天抽到的"}</div>`;
     box.setAttribute("role", "button"); box.tabIndex = 0;
     box.setAttribute("aria-expanded", String(box.classList.contains("open")));
     box.hidden = false;

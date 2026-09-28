@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS ai_wakes (
     at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ai_wakes_by_at ON ai_wakes(at);
+CREATE TABLE IF NOT EXISTS ai_line (
+    day        TEXT PRIMARY KEY,
+    excerpt_id TEXT NOT NULL,
+    why        TEXT NOT NULL DEFAULT '',
+    at         TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS ai_mind (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     at      TEXT NOT NULL,

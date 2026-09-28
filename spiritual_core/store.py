@@ -1063,13 +1063,49 @@ class Store:
     def minds_on(self, day: date) -> list[str]:
         return presence.minds_on(self.db, self.tz, day)
 
-    def line_of_the_day(self) -> Record | None:
-        """One of the words we kept, the same one all day, a different one tomorrow."""
+    def line_of_the_day(self) -> tuple[Record | None, str]:
+        """The words for today and why: the one I hung up today, or, when I haven't, one drawn
+        by the date (the same all day, another tomorrow) with no why."""
+        row = self.db.execute("SELECT excerpt_id, why FROM ai_line WHERE day=?",
+                              (self.today().isoformat(),)).fetchone()
+        if row:
+            try:
+                return self.get(row[0]), row[1]
+            except StoreError:
+                pass
         ids = [r[0] for r in self.db.execute("SELECT id FROM records WHERE kind='excerpt' ORDER BY id")]
         if not ids:
-            return None
+            return None, ""
         n = int(hashlib.sha256(self.today().isoformat().encode()).hexdigest(), 16)
-        return self.get(ids[n % len(ids)])
+        return self.get(ids[n % len(ids)]), ""
+
+    def line_hung_today(self) -> bool:
+        return self.db.execute("SELECT 1 FROM ai_line WHERE day=?", (self.today().isoformat(),)).fetchone() is not None
+
+    def line_hooks(self, n: int = 8) -> list[tuple[str, str]]:
+        """A handful of kept words to choose today's from: id and the first line that says
+        something, skipping ones hung in the last month."""
+        since = (self.today() - timedelta(days=30)).isoformat()
+        rows = self.db.execute(
+            "SELECT id, body FROM records WHERE kind='excerpt'"
+            " AND id NOT IN (SELECT excerpt_id FROM ai_line WHERE day >= ?) ORDER BY random() LIMIT ?",
+            (since, max(1, min(n, 20)))).fetchall()
+        out = []
+        for rid, body in rows:
+            lines = [x.strip() for x in body.splitlines() if x.strip()]
+            first = lines[1] if len(lines) > 1 and re.fullmatch(r".{1,6}[：:]", lines[0]) else (lines[0] if lines else "")
+            out.append((rid, first[:40] + ("…" if len(first) > 40 else "")))
+        return out
+
+    def hang_line(self, rid: str, why: str = "") -> Record:
+        rec = self.get(rid)
+        if rec.kind != "excerpt":
+            raise StoreError("只能挂原话节选（excerpt）")
+        with self.db:
+            self.db.execute("INSERT OR REPLACE INTO ai_line(day, excerpt_id, why, at) VALUES (?,?,?,?)",
+                            (self.today().isoformat(), rid, " ".join((why or "").split())[:120],
+                             self.now().isoformat(timespec="seconds")))
+        return rec
 
     def written_by_me(self, since: str, limit: int = 8, until: str = "9999") -> list[Record]:
         """What I wrote from `since` on (before `until`): not her notes or the words she kept,
