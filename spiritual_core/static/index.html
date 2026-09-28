@@ -460,6 +460,11 @@
   .pages { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
   .save-tabs { grid-template-columns: repeat(3, 1fr); }
   .page > h2:first-child { margin-top: 4px; }
+  /* 浅: anything pressed is the mood color one shade lighter, the same as the selected tab */
+  :root[data-theme="light"] :is(.chips button[aria-pressed="true"], .theme button[aria-pressed="true"],
+      .rate button.on, .layer.new, .close, .edit-actions .e-save, .edit-actions .r-send) {
+    background: color-mix(in oklch, var(--glass) 42%, var(--card)); color: var(--ink); }
+  :root[data-theme="light"] .tabs button[aria-selected="true"] { background: color-mix(in oklch, var(--glass) 42%, var(--card)); }
   /* tap a side to open its detail under both, tap again to fold it */
   .side { cursor: pointer; text-align: left; font: inherit; color: inherit; display: block; width: 100%;
           transition: border-color .2s ease; }
@@ -673,8 +678,9 @@
     "想你": { h: 318, s: 1, top: { light: [0.87, 0.085], dark: [0.36, 0.09] }, ac: 0.14 },   // 魅惑紫，黏糊
     "开心": { h: 92, s: 1, top: { light: [0.94, 0.10], dark: [0.34, 0.025] }, ah: 50, ac: 0.13 }, // 阳光
     "平静": { h: 165, s: 0.9 },
-    "馋": { h: 2, s: 1, top: { light: [0.84, 0.10], dark: [0.33, 0.10] }, ah: 8, ac: 0.16, // 酒红，要有欲望
-            dh: 8, dot: { light: [0.52, 0.16], dark: [0.62, 0.17] } },                        // its own depth, or it reads as 甜
+    "馋": { h: 8, s: 1, top: { light: [0.78, 0.12], dark: [0.33, 0.11] }, ah: 8, ac: 0.16, // 酒红，要有欲望：天也压深一度，不跟甜的粉撞
+            dh: 8, dot: { light: [0.52, 0.16], dark: [0.62, 0.17] },                          // its own depth, or it reads as 甜
+          },
     "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "焦虑": { h: 205, s: 0.7 },
     "生气": { h: 30, s: 1.1, ah: 32, ac: 0.16,                                               // 火焰橙红
             dh: 32, dot: { light: [0.66, 0.20], dark: [0.72, 0.18] } },
@@ -740,7 +746,10 @@
       "--line": ok(R.line, scheme === "dark" ? DARK.base : hue, quiet),
       "--accent": accent, "--accent-ink": ok(R.accentInk, M.ah ?? hue),
       // at night the glass takes the accent's hue, so every button wears the same mood color
-      "--glass": ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], scheme === "dark" ? (M.ah ?? hue) : hue, Math.min(scale, 1)),
+      // buttons and tabs wear the same color as her mood's dot; every surface mixes it in partway,
+      // so it reads as one shade lighter than the dot and the ink on it stays legible
+      "--glass": currentMood && MOOD[currentMood] ? moodDot(currentMood)
+        : ok(scheme === "dark" ? [0.62, 0.12] : [0.80, 0.15], scheme === "dark" ? (M.ah ?? hue) : hue, Math.min(scale, 1)),
       "--ink": ok(R.ink, hue), "--muted": ok(R.muted, hue), "--on-sky": ok(R.onSky, hue),
     };
     const root = document.documentElement.style;
