@@ -291,6 +291,11 @@
   .edit-actions .e-save { background: var(--on-bg); color: var(--on-ink); border-color: transparent; font-weight: 600; }
   .editor .msg { text-align: right; }
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .gallery .ph { position: relative; display: block; }
+  .del-x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0;
+           padding: 0; font: inherit; font-size: 14px; line-height: 24px; cursor: pointer;
+           background: rgba(20, 16, 28, .55); color: #fff; }
+  .edit.danger { color: var(--bad); }
   .gallery img, .rec .full .gallery img { width: 100%; aspect-ratio: 1; height: auto; object-fit: cover;
                                           border-radius: 10px; margin: 0; }
   .strip { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
@@ -1050,6 +1055,19 @@
   }
 
   async function shelfClick(ev) {
+    const del = ev.target.closest(".del-img, .del-x");
+    if (del) {
+      ev.preventDefault();
+      if (!confirm("删掉这张照片？网页上就没了。（文件陆能收在电脑的回收处，后悔了跟他说。）")) return;
+      del.disabled = true;
+      try {
+        const data = await (await fetch(`api/image/${encodeURIComponent(del.dataset.id)}/delete`, { method: "POST" })).json();
+        if (!data.ok) throw new Error(data.error);
+        const ph = del.closest(".ph"), d = del.closest("details");
+        if (ph && d.querySelectorAll(".ph").length > 1) ph.remove(); else d.remove();
+      } catch (e) { alert(e.message || "没删掉"); del.disabled = false; }
+      return;
+    }
     const editBtn = ev.target.closest(".edit");
     if (editBtn) {
       const d = editBtn.closest("details"), it = ITEMS.get(editBtn.dataset.id);
@@ -1222,7 +1240,7 @@
       ? `<div class="meta" style="margin-top:8px">陆能 ${when(it.unlocked_at)} 打开给你看的</div>` : "";
     const imgs = it.images || (it.kind === "image" ? [it.id] : []);
     const img = imgs.length > 1
-      ? `<div class="gallery">${imgs.map((id) => `<a href="img/${esc(id)}" target="_blank" rel="noopener"><img src="img/${esc(id)}?size=thumb" alt="" loading="lazy"></a>`).join("")}</div>`
+      ? `<div class="gallery">${imgs.map((id) => `<span class="ph"><a href="img/${esc(id)}" target="_blank" rel="noopener"><img src="img/${esc(id)}?size=thumb" alt="" loading="lazy"></a><button type="button" class="del-x" data-id="${esc(id)}" aria-label="删掉这张">×</button></span>`).join("")}</div>`
       : imgs.length ? `<a href="img/${esc(imgs[0])}" target="_blank" rel="noopener"><img src="img/${esc(imgs[0])}?size=thumb" alt="" loading="lazy"></a>` : "";
     const who = it.kept_by ? ` · ${esc(it.kept_by)}` : "";
     const tick = it.kind === "plan"
@@ -1235,7 +1253,7 @@
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
       ${rateHtml(it)}
-      <div class="close-wrap">${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
+      <div class="close-wrap">${it.kind === "image" && imgs.length === 1 ? `<button type="button" class="edit danger del-img" data-id="${esc(it.id)}">删除</button>` : ""}${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
   }
 
   async function loadBrowse(first) {

@@ -682,6 +682,29 @@ class Store:
                 self.db.execute("UPDATE records SET batch=? WHERE id=?", (batch, rec.id))
         return self.get(rec.id)
 
+    def delete_image(self, rid: str) -> None:
+        """Take a photo off the page. Nothing is destroyed: the file and a JSON of its record
+        (with any revisions and links) go to data/trash/, from where it can be put back."""
+        rec = self.get(rid)
+        if rec.kind != "image":
+            raise StoreError("只有照片能从网页上删")
+        row = self.db.execute("SELECT * FROM images WHERE record_id=?", (rid,)).fetchone()
+        trash = self.path.parent / "trash"
+        trash.mkdir(exist_ok=True)
+        keep = {
+            "record": dict(self.db.execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()),
+            "image": dict(row) if row else None,
+            "revisions": [dict(r) for r in self.db.execute("SELECT * FROM revisions WHERE record_id=?", (rid,))],
+            "links": [dict(r) for r in self.db.execute("SELECT * FROM links WHERE a=? OR b=?", (rid, rid))],
+            "deleted_at": self.now().isoformat(timespec="seconds"),
+        }
+        (trash / f"{rid}.json").write_text(json.dumps(keep, ensure_ascii=False, indent=1), encoding="utf-8")
+        if row and (self.images_dir / row["file"]).exists():
+            (self.images_dir / row["file"]).replace(trash / row["file"])
+        with self.db:
+            self.db.execute("DELETE FROM revisions WHERE record_id=?", (rid,))
+            self.db.execute("DELETE FROM records WHERE id=?", (rid,))
+
     def batch_members(self, batch: str) -> list[Record]:
         if not batch:
             return []

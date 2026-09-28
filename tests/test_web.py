@@ -333,3 +333,19 @@ def test_i_hang_the_line_of_the_day(env):
     v = client.get("/k/api/us").json()
     assert v["line"]["id"] == a.id and v["line"]["picked"] and v["line"]["why"] == "今天想让你看到这句"
     assert a.id not in dict(store.line_hooks())                  # hung this month, not offered again
+
+
+def test_she_can_take_a_photo_off_the_page(env, tmp_path):
+    import sys
+    sys.path.insert(0, "tests")
+    from test_store import _jpeg
+    store, client = env
+    r = client.post("/k/api/image", files={"file": ("a.jpg", _jpeg(), "image/jpeg")}, data={"caption": "不满意"}).json()
+    rid = r["item"]["id"]
+    note = store.write("note", "不是照片")
+    assert client.post(f"/k/api/image/{note.id}/delete").status_code == 400
+    assert client.post(f"/k/api/image/{rid}/delete").json()["ok"]
+    assert client.get(f"/k/img/{rid}").status_code == 404
+    trash = store.path.parent / "trash"
+    assert (trash / f"{rid}.json").exists() and any(p.suffix in (".jpg", ".jpeg") for p in trash.iterdir())
+    assert store.search("不满意") == []

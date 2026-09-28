@@ -72,6 +72,14 @@ def mount(mcp, store: Store, secret: str) -> None:
             return _err(str(e))
         return JSONResponse({"ok": True, "item": _item(rec)})
 
+    @mcp.custom_route(p + "/api/image/{rid}/delete", methods=["POST"])
+    async def image_delete(request: Request):
+        try:
+            store.delete_image(request.path_params["rid"])
+        except StoreError as e:
+            return _err(str(e))
+        return JSONResponse({"ok": True})
+
     @mcp.custom_route(p + "/api/health", methods=["POST"])
     async def health_in(request: Request):
         """The phone's Shortcuts pushes the watch's numbers here. See health.py for the format."""
