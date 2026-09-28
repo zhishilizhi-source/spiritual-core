@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS ai_wakes (
     at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ai_wakes_by_at ON ai_wakes(at);
+CREATE TABLE IF NOT EXISTS ai_mind (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    at      TEXT NOT NULL,
+    text    TEXT NOT NULL,
+    done_at TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS ai_now (
     id   INTEGER PRIMARY KEY AUTOINCREMENT,
     at   TEXT NOT NULL,
@@ -60,6 +66,46 @@ def set_now(db, now: datetime, text: str, mood: str = "") -> dict:
         db.execute("INSERT INTO ai_now(at, text, mood) VALUES (?, ?, ?)",
                    (now.isoformat(timespec="seconds"), text, mood))
     return latest_now(db)
+
+
+# What I keep turning over: at most three at once, in my words, until I let one go.
+MIND_MAX_OPEN = 3
+MIND_MAX = 80
+
+
+def add_mind(db, now: datetime, text: str) -> dict:
+    text = " ".join((text or "").split())[:MIND_MAX]
+    if not text:
+        raise ValueError("惦记的事不能是空的")
+    if len(open_minds(db)) >= MIND_MAX_OPEN:
+        raise ValueError(f"已经惦记着 {MIND_MAX_OPEN} 件了，先放下一件（let_go）再挂新的")
+    with db:
+        cur = db.execute("INSERT INTO ai_mind(at, text) VALUES (?, ?)", (now.isoformat(timespec="seconds"), text))
+    return {"id": cur.lastrowid, "at": now.isoformat(timespec="seconds"), "text": text}
+
+
+def let_go(db, now: datetime, mid: int) -> dict:
+    row = db.execute("SELECT id, text, done_at FROM ai_mind WHERE id=?", (mid,)).fetchone()
+    if not row:
+        raise ValueError(f"没有 {mid} 这件")
+    if row[2]:
+        raise ValueError(f"「{row[1]}」已经放下了")
+    with db:
+        db.execute("UPDATE ai_mind SET done_at=? WHERE id=?", (now.isoformat(timespec="seconds"), mid))
+    return {"id": row[0], "text": row[1]}
+
+
+def open_minds(db) -> list[dict]:
+    return [{"id": i, "at": a, "text": t} for i, a, t in db.execute(
+        "SELECT id, at, text FROM ai_mind WHERE done_at='' ORDER BY at, id")]
+
+
+def minds_on(db, tz, day: date) -> list[str]:
+    """What was on my mind at some point that day."""
+    lo = datetime.combine(day, time(0), tz).isoformat()
+    hi = datetime.combine(day + timedelta(days=1), time(0), tz).isoformat()
+    return [t for (t,) in db.execute(
+        "SELECT text FROM ai_mind WHERE at < ? AND (done_at='' OR done_at >= ?) ORDER BY at, id", (hi, lo))]
 
 
 def now_on(db, tz, day: date) -> list[dict]:

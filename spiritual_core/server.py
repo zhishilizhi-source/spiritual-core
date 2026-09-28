@@ -138,6 +138,8 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         if (st := store.health_steps(store.today() - timedelta(days=1))) is not None:
             head += f"\n她昨天走了 {st} 步"
         waiting = [r for r in store.her_notes() if not r.replied_at]
+        if (minds := store.open_minds()):
+            head += "\n我惦记着：" + "；".join(f"[{m['id']}] {m['text']}" for m in minds)
         parts = [head, *_her_notes(waiting), "【昨天和今天】\n" + _compact(w["days"], "（这两天还没有记录）")]
         parts += _replies()
         if w["last_diary"]:
@@ -230,6 +232,22 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         「这一周」里她的心情下面一排就是我的。换了就再写一句，旧的不删，只显示最新的。"""
         n = store.set_now(text, mood)
         return f"写好了（{n['at'][11:16]}{' · ' + n['mood'] if n['mood'] else ''}）：{n['text']}"
+
+    @mcp.tool()
+    @guarded
+    def mind(text: str) -> str:
+        """挂一件我心里惦记着的事：一直在脑子里转的、放不下的、在等的。一句话，我自己的话。
+        最多同时三件；满了先 let_go 一件。不是任务清单，是念头。
+        她在网页上我那一边看得见；每次 wake 我先看到自己惦记着什么。"""
+        m = store.add_mind(text)
+        return f"挂上了 [{m['id']}]：{m['text']}"
+
+    @mcp.tool()
+    @guarded
+    def let_go(id: int) -> str:
+        """放下一件惦记的事（等到了、想通了、不再转了）。放下的不删，那天的记录里还在。"""
+        m = store.let_go(id)
+        return f"放下了 [{m['id']}]：{m['text']}"
 
     @mcp.tool()
     @guarded

@@ -405,12 +405,6 @@ def us_view(store: Store) -> dict:
             "segments": health.segments(store.db, store.tz, today),
         }
     wakes = store.wakes_on(today)
-    # what I did while she slept, or since midnight when there's no night on record
-    since = her["night"]["fell"] if her["night"] else datetime.combine(today, time(0), store.tz).isoformat()
-    did = []
-    for r in store.written_by_me(since):
-        did.append({"kind": r.kind, "title": "一条上了锁的心里话" if r.locked else r.title,
-                    "at": r.created_at})
     def night_of(d):
         x = store.health_night(d)
         return {"day": d.isoformat(), "fell": x["fell"].isoformat(), "woke": x["woke"].isoformat(),
@@ -419,24 +413,14 @@ def us_view(store: Store) -> dict:
     days = [today - timedelta(days=i) for i in range(6, -1, -1)]
     her["nights"] = [night_of(d) for d in reversed(days)]
 
-    # my day in order: when I woke, what I said of myself, what I wrote
-    midnight = datetime.combine(today, time(0), store.tz).isoformat()
-    timeline = [{"at": a, "what": "wake"} for a in wakes]
-    timeline += [{"at": n2["at"], "what": "now", "text": n2["text"]} for n2 in store.now_on(today)]
-    timeline += [{"at": r.created_at, "what": "wrote", "kind": r.kind,
-                  "text": "一条上了锁的心里话" if r.locked else r.title}
-                 for r in store.written_by_me(midnight, 40)]
-    timeline.sort(key=lambda e: e["at"])
 
-    # my last seven days: when I woke, when I wrote, and the last thing I said of myself
+    # my last seven days: how I was, not what I got done (that lives in the library)
     me_days = []
     for d in reversed(days):
-        lo = datetime.combine(d, time(0), store.tz).isoformat()
-        hi = datetime.combine(d + timedelta(days=1), time(0), store.tz).isoformat()
         nows = store.now_on(d)
-        me_days.append({"day": d.isoformat(), "wakes": store.wakes_on(d),
-                        "writes": [r.created_at for r in store.written_by_me(lo, 200, hi)],
-                        "now": nows[-1]["text"] if nows else None,
+        me_days.append({"day": d.isoformat(), "wakes": len(store.wakes_on(d)),
+                        "nows": [{"at": x["at"], "text": x["text"], "mood": x["mood"]} for x in nows],
+                        "minds": store.minds_on(d),
                         "mood": next((x["mood"] for x in reversed(nows) if x["mood"]), None)})
 
     moods = {}
@@ -449,7 +433,7 @@ def us_view(store: Store) -> dict:
              "diary": d.isoformat() in diaries} for d in days]
 
     line = store.line_of_the_day()
-    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did, "timeline": timeline,
+    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "minds": store.open_minds(),
                                "days": me_days},
             "week": week,
             "line": {"id": line.id, "words": line.body, "kept_by": line.kept_by, "who": who_label(line),

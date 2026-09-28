@@ -1045,6 +1045,24 @@ class Store:
     def now_on(self, day: date) -> list[dict]:
         return presence.now_on(self.db, self.tz, day)
 
+    def add_mind(self, text: str) -> dict:
+        try:
+            return presence.add_mind(self.db, self.now(), text)
+        except ValueError as e:
+            raise StoreError(str(e)) from None
+
+    def let_go(self, mid: int) -> dict:
+        try:
+            return presence.let_go(self.db, self.now(), int(mid))
+        except (ValueError, TypeError) as e:
+            raise StoreError(str(e)) from None
+
+    def open_minds(self) -> list[dict]:
+        return presence.open_minds(self.db)
+
+    def minds_on(self, day: date) -> list[str]:
+        return presence.minds_on(self.db, self.tz, day)
+
     def line_of_the_day(self) -> Record | None:
         """One of the words we kept, the same one all day, a different one tomorrow."""
         ids = [r[0] for r in self.db.execute("SELECT id FROM records WHERE kind='excerpt' ORDER BY id")]

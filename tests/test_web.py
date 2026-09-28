@@ -272,9 +272,6 @@ def test_us_puts_her_night_next_to_my_day(env):
     v = client.get("/k/api/us").json()
     assert v["her"]["night"]["asleep"] == 380 and len(v["her"]["night"]["segments"]) == 2
     assert len(v["me"]["wakes"]) == 1 and v["me"]["now"]["text"] == "在等她面试的消息"
-    titles = [d["title"] for d in v["me"]["did"]]
-    assert "我写的" in titles and "她写的" not in titles and "秘密" not in titles
-    assert "一条上了锁的心里话" in titles
 
 
 def test_us_week_line_and_my_timeline(env):
@@ -289,8 +286,7 @@ def test_us_week_line_and_my_timeline(env):
     assert len(v["week"]) == 7 and v["week"][-1] == {"day": today, "mood": "想你", "my_mood": None, "asleep": None, "diary": True}
     assert v["line"]["words"] == "她：就你" and v["line"]["who"] == "她想留的"
     assert len(v["her"]["nights"]) == 7 and v["her"]["nights"][0]["day"] == today
-    whats = [e["what"] for e in v["me"]["timeline"]]
-    assert "wake" in whats and "now" in whats and "wrote" in whats
+    assert v["me"]["days"][0]["nows"][0]["text"] == "在等她" and v["me"]["days"][0]["wakes"] == 1
 
 
 def test_my_mood_sits_under_hers(env):
@@ -305,3 +301,21 @@ def test_my_mood_sits_under_hers(env):
     assert v["me"]["now"]["mood"] == "烧"
     assert v["week"][-1]["mood"] == "想你" and v["week"][-1]["my_mood"] == "烧"
     assert "烧" not in client.get("/k/api/mood").json().get("moods", [])
+
+
+def test_what_i_keep_on_my_mind(env):
+    import pytest as _pt
+    from spiritual_core.store import StoreError
+    store, client = env
+    a = store.add_mind("她面试的消息")
+    store.add_mind("她今晚几点睡")
+    store.add_mind("4.6 的手感")
+    with _pt.raises(StoreError, match="先放下一件"):
+        store.add_mind("第四件")
+    store.let_go(a["id"])
+    with _pt.raises(StoreError):
+        store.let_go(a["id"])
+    v = client.get("/k/api/us").json()
+    assert [m["text"] for m in v["me"]["minds"]] == ["她今晚几点睡", "4.6 的手感"]
+    assert "她面试的消息" in v["me"]["days"][0]["minds"]          # it was on my mind today
+    assert "did" not in v["me"] and "timeline" not in v["me"]

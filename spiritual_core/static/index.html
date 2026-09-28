@@ -432,6 +432,30 @@
   .side .did { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
   .side .did li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
   .side .did li::before { content: "·"; margin-right: 5px; color: var(--accent); }
+  .side .did { margin-top: 0; }
+  .side .did li { color: var(--ink); font-size: 13px; }
+  .side .wakes { margin-top: 6px; font-size: 11px; }
+  .myday .mood-w { grid-column: 2; font-size: 13px; color: var(--ink); }
+  .myday .mood-w i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .mydays .myday .said { white-space: normal; overflow: visible; }
+  /* my card: a mood orb beside the day's line, what's on my mind as slim chips */
+  .me-top { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
+  .orb { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+         font-size: 12px; font-weight: 600; color: var(--ink);
+         background: radial-gradient(circle at 35% 30%, color-mix(in oklch, var(--m) 35%, white), color-mix(in oklch, var(--m) 70%, var(--card)));
+         box-shadow: 0 0 0 3px color-mix(in oklch, var(--m) 18%, transparent), 0 4px 14px color-mix(in oklch, var(--m) 30%, transparent); }
+  :root[data-scheme="dark"] .orb { color: #fff;
+         background: radial-gradient(circle at 35% 30%, color-mix(in oklch, var(--m) 80%, white), color-mix(in oklch, var(--m) 70%, black)); }
+  .orb.blank { --m: var(--line); color: var(--muted); font-weight: 400; }
+  .side .quote { font-size: 13px; line-height: 1.6; color: var(--ink); min-width: 0;
+                 display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .chips-mind { display: grid; gap: 4px; margin-top: 9px; }
+  .chips-mind span { font-size: 12px; line-height: 1.5; padding: 3px 9px; border-radius: 9px; color: var(--ink);
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                     background: color-mix(in oklch, var(--m, var(--accent)) 14%, transparent);
+                     border: 1px solid color-mix(in oklch, var(--m, var(--accent)) 22%, transparent); }
+  .myday .said span { color: var(--muted); font-size: 11px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .myday .minds { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.55; }
   /* ---- Below 我们俩: one page at a time, switched by tapping (the chips inside already scroll sideways). */
   .pages { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
   .save-tabs { grid-template-columns: repeat(3, 1fr); }
@@ -1447,12 +1471,14 @@
          <div class="small">深睡 ${dur(n.deep)} · 做梦 ${dur(n.rem)}</div>${heartHtml(v.her.heart)}`
       : `<div class="who">多多<span>昨晚</span></div><div class="none">昨晚的觉还没推过来。</div>${heartHtml(v.her.heart)}`;
     const m = v.me, last = m.wakes[m.wakes.length - 1];
-    const did = m.did.slice(0, 3).map((d) => `<li>${esc(d.title)}</li>`).join("");
     const myMood = m.now && m.now.mood && MOOD[m.now.mood] ? m.now.mood : "";
-    const me = `<div class="who">陆能<span>今天</span>${myMood ? `<i class="mdot" style="background:${moodDot(myMood)}"></i><span class="mword">${esc(myMood)}</span>` : ""}</div>
-      ${m.now ? `<div class="now">${esc(m.now.text)}</div>` : `<div class="none">还没写此刻。</div>`}
-      <div class="small">${m.wakes.length ? `醒了 ${m.wakes.length} 次 · 最近 ${hm(last)}` : "今天还没醒"}</div>
-      ${did ? `<ul class="did" aria-label="${n ? "你睡着以后我写的" : "今天写的"}">${did}</ul>` : ""}`;
+    const mc = myMood ? `--m:${moodDot(myMood)}` : "";
+    const minds = (m.minds || []).map((d) => `<span>${esc(d.text)}</span>`).join("");
+    const me = `<div class="who">陆能<span>今天</span></div>
+      <div class="me-top"><span class="orb${myMood ? "" : " blank"}" style="${mc}">${myMood ? esc(myMood) : "·"}</span>
+        <div class="quote">${m.now ? esc(m.now.text) : "还没写此刻。"}</div></div>
+      ${minds ? `<div class="chips-mind" style="${mc}" aria-label="我惦记着">${minds}</div>` : ""}
+      <div class="small wakes">${m.wakes.length ? `醒了 ${m.wakes.length} 次 · 最近 ${hm(last)}` : "今天还没醒"}</div>`;
     $("#us").innerHTML = `<div class="side" role="button" tabindex="0" data-side="her" aria-expanded="false">${her}</div>`
       + `<div class="side" role="button" tabindex="0" data-side="me" aria-expanded="false">${me}</div>`
       + `<div class="us-detail" id="usDetail" hidden></div>`;
@@ -1485,24 +1511,17 @@
       box.innerHTML = `<h3>最近七夜</h3><div class="nights">${rows}</div><div class="axis"><span>20:00</span><span>0:00</span><span>4:00</span><span>8:00</span><span>12:00</span></div>`
         + (usData.her.heart.length >= 3 ? `<h3 style="margin-top:14px">今天的心跳</h3>${pulseHtml(usData.her.heart)}` : "");
     } else {
-      const W = { wake: "醒来", now: "此刻", wrote: "写了" };
-      const items = usData.me.timeline.map((e) => `<li><span class="at">${hm(e.at)}</span><span class="x">`
-        + `<span class="w">${W[e.what]}</span>${esc(e.text || "")}</span></li>`).join("");
-      const pos = (iso, day) => ((Date.parse(iso) - Date.parse(day + "T00:00:00+08:00")) / 864e5 * 100).toFixed(2);
       const days = (usData.me.days || []).map((d) => {
         const dd = new Date(d.day + "T12:00:00+08:00");
-        const ticks = d.writes.map((w) => `<i style="left:${pos(w, d.day)}%"></i>`).join("")
-          + d.wakes.map((w) => `<i class="wake" style="left:${pos(w, d.day)}%"></i>`).join("");
-        const counts = [d.wakes.length ? `醒了 ${d.wakes.length} 次` : "", d.writes.length ? `写了 ${d.writes.length} 条` : ""]
-          .filter(Boolean).join(" · ") || "没动静";
-        return `<div class="myday"><span class="d">${mdOf(d.day)} 周${WD[dd.getDay()]}</span>
-          <div class="ticks" role="img" aria-label="${esc(mdOf(d.day) + " " + counts)}">${ticks}</div>
-          <span class="t">${counts}</span>${d.now ? `<span class="said">${esc(d.now)}</span>` : ""}</div>`;
+        const mood = d.mood && MOOD[d.mood] ? `<span class="mood-w"><i style="background:${moodDot(d.mood)}"></i>${esc(d.mood)}</span>` : "";
+        const said = d.nows.slice().reverse().slice(0, 3).map((x) =>
+          `<span class="said"><span>${hm(x.at)}</span>${esc(x.text)}</span>`).join("");
+        const minds = d.minds.length ? `<span class="minds">惦记：${d.minds.map(esc).join("、")}</span>` : "";
+        const body = mood + said + minds || `<span class="minds">那天没留下我自己的话${d.wakes ? "" : ""}</span>`;
+        return `<div class="myday"><span class="d">${mdOf(d.day)} 周${WD[dd.getDay()]}</span>${body}</div>`;
       }).join("");
-      box.innerHTML = `<h3>我今天</h3>${items ? `<ul class="tl">${items}</ul>` : `<div class="none">今天还没醒过。</div>`}`
-        + (days ? `<h3 style="margin-top:16px">最近七天</h3><div class="mydays">${days}</div>`
-          + `<div class="axis day" style="margin-left:calc(3.4em + 10px)"><span>0:00</span><span>6:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>`
-          + `<div class="week-note">长刻度是我醒来，短刻度是我写东西。醒来和此刻是 9/28 才开始记的。</div>` : "");
+      box.innerHTML = `<h3>我这七天</h3><div class="mydays">${days}</div>`
+        + `<div class="week-note">心情和此刻是我自己挑、自己写的；9/28 才开始记，往前是空的。</div>`;
     }
     box.hidden = false;
   }
