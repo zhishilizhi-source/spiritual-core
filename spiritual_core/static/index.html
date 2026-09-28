@@ -673,8 +673,10 @@
     "想你": { h: 318, s: 1, top: { light: [0.87, 0.085], dark: [0.36, 0.09] }, ac: 0.14 },   // 魅惑紫，黏糊
     "开心": { h: 92, s: 1, top: { light: [0.94, 0.10], dark: [0.34, 0.025] }, ah: 50, ac: 0.13 }, // 阳光
     "平静": { h: 165, s: 0.9 },
-    "馋": { h: 2, s: 1, top: { light: [0.84, 0.10], dark: [0.33, 0.10] }, ac: 0.15 },       // 酒红，要有欲望
-    "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "生气": { h: 20, s: 1.2 }, "焦虑": { h: 205, s: 0.7 },
+    "馋": { h: 2, s: 1, top: { light: [0.84, 0.10], dark: [0.33, 0.10] }, ac: 0.15,        // 酒红，要有欲望
+            dh: 8, dot: { light: [0.52, 0.16], dark: [0.62, 0.17] } },                        // its own depth, or it reads as 甜
+    "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "焦虑": { h: 205, s: 0.7 },
+    "生气": { h: 20, s: 1.2, dh: 32, dot: { light: [0.66, 0.20], dark: [0.72, 0.18] } },   // 火焰橙红
     // his own three, only ever his: never offered as her chips
     "酸": { h: 125, s: 1 }, "怂": { h: 70, s: 0.45 }, "烧": { h: 35, s: 1.2 },
   };
@@ -705,8 +707,8 @@
 
   const ok = ([l, c], h, scale = 1) => `oklch(${l} ${(c * scale).toFixed(3)} ${h})`;
   function phase(h) { return h >= 5 && h < 9 ? "dawn" : h >= 9 && h < 16 ? "day" : h >= 16 && h < 19 ? "dusk" : "night"; }
-  const moodDot = (m) => ok(ROLES[isDark() ? "dark" : "light"].dot, MOOD[m].ah ?? MOOD[m].h,
-    MOOD[m].ac ? 1.1 : Math.min(MOOD[m].s, 1));
+  const moodDot = (m) => MOOD[m].dot ? ok(MOOD[m].dot[isDark() ? "dark" : "light"], MOOD[m].dh ?? MOOD[m].h)
+    : ok(ROLES[isDark() ? "dark" : "light"].dot, MOOD[m].ah ?? MOOD[m].h, MOOD[m].ac ? 1.1 : Math.min(MOOD[m].s, 1));
 
   function paintSky() {
     const scheme = isDark() ? "dark" : "light";
