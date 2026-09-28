@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS health_steps (
 """
 
 MAX_LINES = 20000
+BARS = ("｜", "│", "∣", "丨", "ǀ")   # ｜ │ ∣ 丨 ǀ
 
 # Health's sleep stage names, as the phone may spell them, to one word each.
 STAGES = {
@@ -60,6 +61,9 @@ def _rows(text: str):
     if len(lines) > MAX_LINES:
         raise HealthError(f"一次最多 {MAX_LINES} 行")
     for line in lines:
+        # a Chinese keyboard types the full-width bar, or a look-alike
+        for bar in BARS:
+            line = line.replace(bar, "|")
         yield [f.strip() for f in line.split("|")]
 
 

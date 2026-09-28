@@ -52,3 +52,8 @@ def test_bad_lines_are_refused_plainly(store):
         store.health_ingest(heart="2026-09-28T01:30:00|54")
     assert store.health_night(date(2026, 9, 28)) is None
 
+
+
+def test_full_width_bars_from_a_chinese_keyboard(store):
+    got = store.health_ingest(sleep="2026-09-28T01:39:54+08:00 ｜ 2026-09-28T01:57:49+08:00 ｜ Core")
+    assert got["sleep"] == 1
