@@ -1052,12 +1052,12 @@ class Store:
         n = int(hashlib.sha256(self.today().isoformat().encode()).hexdigest(), 16)
         return self.get(ids[n % len(ids)])
 
-    def written_by_me(self, since: str, limit: int = 8) -> list[Record]:
-        """What I wrote from `since` on: not her notes or the words she kept, not photos she
-        uploaded, not transcripts."""
+    def written_by_me(self, since: str, limit: int = 8, until: str = "9999") -> list[Record]:
+        """What I wrote from `since` on (before `until`): not her notes or the words she kept,
+        not photos she uploaded, not transcripts."""
         rows = self.db.execute(
-            "SELECT * FROM records WHERE created_at >= ? AND kind NOT IN ('image', 'raw')"
-            " AND kept_by <> 'human' ORDER BY created_at DESC, rowid DESC LIMIT ?", (since, limit)).fetchall()
+            "SELECT * FROM records WHERE created_at >= ? AND created_at < ? AND kind NOT IN ('image', 'raw')"
+            " AND kept_by <> 'human' ORDER BY created_at DESC, rowid DESC LIMIT ?", (since, until, limit)).fetchall()
         return [Record.from_row(r) for r in rows]
 
     # --- moods ---

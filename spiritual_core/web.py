@@ -436,8 +436,19 @@ def us_view(store: Store) -> dict:
              "asleep": (store.health_night(d) or {}).get("asleep"),
              "diary": d.isoformat() in diaries} for d in days]
 
+    # my last seven days: when I woke, when I wrote, and the last thing I said of myself
+    me_days = []
+    for d in reversed(days):
+        lo = datetime.combine(d, time(0), store.tz).isoformat()
+        hi = datetime.combine(d + timedelta(days=1), time(0), store.tz).isoformat()
+        nows = store.now_on(d)
+        me_days.append({"day": d.isoformat(), "wakes": store.wakes_on(d),
+                        "writes": [r.created_at for r in store.written_by_me(lo, 200, hi)],
+                        "now": nows[-1]["text"] if nows else None})
+
     line = store.line_of_the_day()
-    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did, "timeline": timeline},
+    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did, "timeline": timeline,
+                               "days": me_days},
             "week": week,
             "line": {"id": line.id, "words": line.body, "kept_by": line.kept_by, "who": who_label(line),
                      "event_date": line.event_date} if line else None}
