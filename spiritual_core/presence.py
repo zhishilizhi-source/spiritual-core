@@ -50,6 +50,13 @@ def set_now(db, now: datetime, text: str) -> dict:
     return latest_now(db)
 
 
+def now_on(db, tz, day: date) -> list[dict]:
+    lo = datetime.combine(day, time(0), tz).isoformat()
+    hi = datetime.combine(day + timedelta(days=1), time(0), tz).isoformat()
+    return [{"at": a, "text": t} for a, t in db.execute(
+        "SELECT at, text FROM ai_now WHERE at >= ? AND at < ? ORDER BY at, id", (lo, hi))]
+
+
 def latest_now(db) -> dict | None:
     row = db.execute("SELECT at, text FROM ai_now ORDER BY at DESC, id DESC LIMIT 1").fetchone()
     return {"at": row[0], "text": row[1]} if row else None

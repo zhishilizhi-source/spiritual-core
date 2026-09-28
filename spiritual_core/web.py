@@ -411,7 +411,36 @@ def us_view(store: Store) -> dict:
     for r in store.written_by_me(since):
         did.append({"kind": r.kind, "title": "一条上了锁的心里话" if r.locked else r.title,
                     "at": r.created_at})
-    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did}}
+    def night_of(d):
+        x = store.health_night(d)
+        return {"day": d.isoformat(), "fell": x["fell"].isoformat(), "woke": x["woke"].isoformat(),
+                "asleep": x["asleep"], "segments": health.segments(store.db, store.tz, d)} if x else {"day": d.isoformat()}
+
+    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    her["nights"] = [night_of(d) for d in reversed(days)]
+
+    # my day in order: when I woke, what I said of myself, what I wrote
+    midnight = datetime.combine(today, time(0), store.tz).isoformat()
+    timeline = [{"at": a, "what": "wake"} for a in wakes]
+    timeline += [{"at": n2["at"], "what": "now", "text": n2["text"]} for n2 in store.now_on(today)]
+    timeline += [{"at": r.created_at, "what": "wrote", "kind": r.kind,
+                  "text": "一条上了锁的心里话" if r.locked else r.title}
+                 for r in store.written_by_me(midnight, 40)]
+    timeline.sort(key=lambda e: e["at"])
+
+    moods = {}
+    for m in store.mood_log(7):
+        moods[m["day"]] = m["mood"]                  # the day's last one wins
+    diaries = {r.event_date for r in store.timeline(days[0].isoformat(), today.isoformat(), ["diary"])}
+    week = [{"day": d.isoformat(), "mood": moods.get(d.isoformat()),
+             "asleep": (store.health_night(d) or {}).get("asleep"),
+             "diary": d.isoformat() in diaries} for d in days]
+
+    line = store.line_of_the_day()
+    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did, "timeline": timeline},
+            "week": week,
+            "line": {"id": line.id, "words": line.body, "kept_by": line.kept_by, "who": who_label(line),
+                     "event_date": line.event_date} if line else None}
 
 
 def _err(msg: str) -> JSONResponse:

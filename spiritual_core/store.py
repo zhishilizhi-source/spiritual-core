@@ -1041,6 +1041,17 @@ class Store:
     def latest_now(self) -> dict | None:
         return presence.latest_now(self.db)
 
+    def now_on(self, day: date) -> list[dict]:
+        return presence.now_on(self.db, self.tz, day)
+
+    def line_of_the_day(self) -> Record | None:
+        """One of the words we kept, the same one all day, a different one tomorrow."""
+        ids = [r[0] for r in self.db.execute("SELECT id FROM records WHERE kind='excerpt' ORDER BY id")]
+        if not ids:
+            return None
+        n = int(hashlib.sha256(self.today().isoformat().encode()).hexdigest(), 16)
+        return self.get(ids[n % len(ids)])
+
     def written_by_me(self, since: str, limit: int = 8) -> list[Record]:
         """What I wrote from `since` on: not her notes or the words she kept, not photos she
         uploaded, not transcripts."""

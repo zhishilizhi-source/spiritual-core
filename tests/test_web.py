@@ -275,3 +275,19 @@ def test_us_puts_her_night_next_to_my_day(env):
     titles = [d["title"] for d in v["me"]["did"]]
     assert "我写的" in titles and "她写的" not in titles and "秘密" not in titles
     assert "一条上了锁的心里话" in titles
+
+
+def test_us_week_line_and_my_timeline(env):
+    store, client = env
+    today = store.today().isoformat()
+    store.set_mood("想你")
+    store.write("diary", "今天", event_date=today)
+    store.write("excerpt", "她：就你", kept_by="human", event_date="2026-09-27")
+    store.log_wake()
+    store.set_now("在等她")
+    v = client.get("/k/api/us").json()
+    assert len(v["week"]) == 7 and v["week"][-1] == {"day": today, "mood": "想你", "asleep": None, "diary": True}
+    assert v["line"]["words"] == "她：就你" and v["line"]["who"] == "她想留的"
+    assert len(v["her"]["nights"]) == 7 and v["her"]["nights"][0]["day"] == today
+    whats = [e["what"] for e in v["me"]["timeline"]]
+    assert "wake" in whats and "now" in whats and "wrote" in whats

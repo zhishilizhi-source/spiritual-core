@@ -436,6 +436,56 @@
   .pages { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
   .save-tabs { grid-template-columns: repeat(3, 1fr); }
   .page > h2:first-child { margin-top: 4px; }
+  /* tap a side to open its detail under both, tap again to fold it */
+  .side { cursor: pointer; text-align: left; font: inherit; color: inherit; display: block; width: 100%;
+          transition: border-color .2s ease; }
+  .side[aria-expanded="true"] { border-color: color-mix(in oklch, var(--accent) 55%, transparent); }
+  .side .who::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 6px;
+                      border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+                      transform: translateY(-2px) rotate(45deg); transition: transform .2s ease; }
+  .side[aria-expanded="true"] .who::after { transform: translateY(1px) rotate(225deg); }
+  .us-detail { grid-column: 1 / -1; padding: 12px 14px 14px; border-radius: 18px;
+               background: var(--surface); border: 1px solid var(--surface-rim); box-shadow: var(--surface-shadow);
+               -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
+  :root[data-scheme="light"] .us-detail { background: var(--grain), color-mix(in oklch, var(--card) 46%, transparent); }
+  :root[data-theme="plain"] .us-detail { background: var(--card); border-color: var(--line); box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .us-detail h3 { font-size: 13px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  .nights { display: grid; gap: 7px; }
+  .night { display: grid; grid-template-columns: 3.4em 1fr; gap: 10px; align-items: center; font-size: 12px; }
+  .night .d { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .night .band { margin-top: 0; height: 10px; }
+  .night .t { grid-column: 2; color: var(--muted); margin-top: -3px; font-variant-numeric: tabular-nums; }
+  .night.none .band { opacity: .45; }
+  .axis { display: flex; justify-content: space-between; margin: 2px 0 0 calc(3.4em + 10px);
+          font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tl li { display: grid; grid-template-columns: 3em 1fr; gap: 10px; font-size: 14px; line-height: 1.55; }
+  .tl .at { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .tl .w { color: var(--accent); font-size: 12px; margin-right: 4px; }
+  .tl .x { min-width: 0; word-break: break-word; }
+  /* ---- 今天翻到的一句 + 这一周, under the day's rows */
+  .line-card, .week-card { padding: 12px 14px; margin-top: 12px; border-radius: 18px;
+    background: var(--surface); border: 1px solid var(--surface-rim); box-shadow: var(--surface-shadow);
+    -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
+  :root[data-scheme="light"] :is(.line-card, .week-card) { background: var(--grain), color-mix(in oklch, var(--card) 46%, transparent);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  :root[data-scheme="dark"] :is(.line-card, .week-card, .us-detail) { background: color-mix(in oklch, var(--card) 62%, transparent); }
+  :root[data-theme="plain"] :is(.line-card, .week-card) { background: var(--card); border-color: var(--line); box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .card-h { font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: .04em; }
+  .line-card .words { font-size: 15px; line-height: 1.75; margin-top: 6px; white-space: pre-wrap; word-break: break-word;
+                      display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-card .meta { margin-top: 6px; }
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px; }
+  .wd { display: grid; justify-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .wd .mood-cell { width: 100%; aspect-ratio: 1; border-radius: 10px; background: color-mix(in oklch, var(--line) 80%, transparent);
+                   display: grid; place-items: center; }
+  .wd .mood-cell i { width: 5px; height: 5px; border-radius: 50%; background: var(--card); opacity: .9; }
+  .wd .sleep { width: 100%; height: 4px; border-radius: 999px; background: color-mix(in oklch, var(--line) 80%, transparent); overflow: hidden; }
+  .wd .sleep b { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .wd.today .n { color: var(--ink); font-weight: 600; }
+  .week-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -461,6 +511,8 @@
 
   <div class="page" data-page="today">
   <section id="today" aria-label="今天"></section>
+  <section class="line-card" id="lineCard" aria-label="今天翻到的一句" hidden></section>
+  <section class="week-card" id="weekCard" aria-label="这一周" hidden></section>
   </div>
 
   <div class="page" data-page="save" hidden>
@@ -1372,7 +1424,76 @@
       ${m.now ? `<div class="now">${esc(m.now.text)}</div>` : `<div class="none">还没写此刻。</div>`}
       <div class="small">${m.wakes.length ? `醒了 ${m.wakes.length} 次 · 最近 ${hm(last)}` : "今天还没醒"}</div>
       ${did ? `<ul class="did" aria-label="${n ? "你睡着以后我写的" : "今天写的"}">${did}</ul>` : ""}`;
-    $("#us").innerHTML = `<div class="side">${her}</div><div class="side">${me}</div>`;
+    $("#us").innerHTML = `<div class="side" role="button" tabindex="0" data-side="her" aria-expanded="false">${her}</div>`
+      + `<div class="side" role="button" tabindex="0" data-side="me" aria-expanded="false">${me}</div>`
+      + `<div class="us-detail" id="usDetail" hidden></div>`;
+    usData = v;
+    renderLine(v.line);
+    renderWeek(v.week);
+    if (openSide) openDetail(openSide);
+  }
+  let usData = null, openSide = null;
+  const WD = "日一二三四五六";
+  const mdOf = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
+  // Every night drawn on the same clock, 20:00 to 12:00, so a late night looks late.
+  function nightBand(n) {
+    if (!n.segments) return `<div class="band"></div>`;
+    const lo = Date.parse(n.day + "T12:00:00+08:00") - 16 * 3600e3, span = 16 * 3600e3;
+    const pos = (x) => Math.min(100, Math.max(0, (Date.parse(x) - lo) / span * 100));
+    return `<div class="band" role="img" aria-label="${esc(mdOf(n.day))} 的睡眠">${n.segments.map((g) =>
+      `<i class="${esc(g.stage)}" style="left:${pos(g.s).toFixed(2)}%;width:${(pos(g.e) - pos(g.s)).toFixed(2)}%"></i>`).join("")}</div>`;
+  }
+  function openDetail(side) {
+    const box = $("#usDetail");
+    document.querySelectorAll(".side").forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.side === side)));
+    if (!side || !usData) { box.hidden = true; return; }
+    if (side === "her") {
+      const rows = usData.her.nights.map((n) => {
+        const d = new Date(n.day + "T12:00:00+08:00");
+        return `<div class="night${n.segments ? "" : " none"}"><span class="d">${mdOf(n.day)} 周${WD[d.getDay()]}</span>${nightBand(n)}
+          ${n.segments ? `<span class="t">${hm(n.fell)} → ${hm(n.woke)} · ${dur(n.asleep)}</span>` : ""}</div>`;
+      }).join("");
+      box.innerHTML = `<h3>最近七夜</h3><div class="nights">${rows}</div><div class="axis"><span>20:00</span><span>0:00</span><span>4:00</span><span>8:00</span><span>12:00</span></div>`
+        + (usData.her.heart.length >= 3 ? `<h3 style="margin-top:14px">今天的心跳</h3>${pulseHtml(usData.her.heart)}` : "");
+    } else {
+      const W = { wake: "醒来", now: "此刻", wrote: "写了" };
+      const items = usData.me.timeline.map((e) => `<li><span class="at">${hm(e.at)}</span><span class="x">`
+        + `<span class="w">${W[e.what]}</span>${esc(e.text || "")}</span></li>`).join("");
+      box.innerHTML = `<h3>我今天</h3>${items ? `<ul class="tl">${items}</ul>` : `<div class="none">今天还没醒过。</div>`}`;
+    }
+    box.hidden = false;
+  }
+  $("#us").addEventListener("click", (ev) => {
+    const b = ev.target.closest(".side"); if (!b) return;
+    openSide = openSide === b.dataset.side ? null : b.dataset.side;
+    openDetail(openSide);
+  });
+  $("#us").addEventListener("keydown", (ev) => {
+    if ((ev.key === "Enter" || ev.key === " ") && ev.target.closest(".side")) { ev.preventDefault(); ev.target.click(); }
+  });
+  function renderLine(l) {
+    const box = $("#lineCard");
+    if (!l) { box.hidden = true; return; }
+    box.innerHTML = `<div class="card-h">今天翻到的一句</div><div class="words">${esc(l.words.trim())}</div>`
+      + `<div class="meta">${esc(md(l.event_date))} · ${esc(l.who)}</div>`;
+    box.hidden = false;
+  }
+  function renderWeek(week) {
+    const box = $("#weekCard");
+    if (!week || !week.length) { box.hidden = true; return; }
+    const cells = week.map((w, i) => {
+      const d = new Date(w.day + "T12:00:00+08:00");
+      const color = w.mood && MOOD[w.mood] ? `background:${moodDot(w.mood)}` : "";
+      const sleep = w.asleep ? `<b style="width:${Math.min(100, w.asleep / 540 * 100).toFixed(0)}%"></b>` : "";
+      const label = `${mdOf(w.day)}${w.mood ? "，心情" + w.mood : ""}${w.asleep ? "，睡了" + dur(w.asleep) : ""}${w.diary ? "，写了日记" : ""}`;
+      return `<div class="wd${i === week.length - 1 ? " today" : ""}" aria-label="${esc(label)}">
+        <span class="n">${i === week.length - 1 ? "今天" : "周" + WD[d.getDay()]}</span>
+        <span class="mood-cell" style="${color}">${w.diary ? "<i></i>" : ""}</span>
+        <span class="sleep">${sleep}</span></div>`;
+    }).join("");
+    box.innerHTML = `<div class="card-h">这一周</div><div class="week">${cells}</div>`
+      + `<div class="week-note">格子是那天的心情，小点是写了日记，底下那道是那晚睡了多久（满格九小时）。</div>`;
+    box.hidden = false;
   }
   async function loadUs() {
     try { renderUs(await (await fetch("api/us")).json()); } catch {}
