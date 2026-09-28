@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS ai_now (
 """
 
 NOW_MAX = 200
+# Her words for how she is, and three that are mine.
+AI_MOODS = ("甜", "想你", "开心", "平静", "馋", "累", "难过", "生气", "焦虑", "酸", "怂", "烧")
 # A wake within this many minutes of the last one is the same waking (a window re-reading).
 SAME_WAKE_MINUTES = 20
 
@@ -40,23 +42,33 @@ def wakes_on(db, tz, day: date) -> list[str]:
         "SELECT at FROM ai_wakes WHERE at >= ? AND at < ? ORDER BY at", (lo, hi))]
 
 
-def set_now(db, now: datetime, text: str) -> dict:
+def migrate(db) -> None:
+    have = {r[1] for r in db.execute("PRAGMA table_info(ai_now)")}
+    if "mood" not in have:
+        db.execute("ALTER TABLE ai_now ADD COLUMN mood TEXT NOT NULL DEFAULT ''")
+
+
+def set_now(db, now: datetime, text: str, mood: str = "") -> dict:
     text = " ".join((text or "").split())
+    mood = (mood or "").strip()
     if not text:
         raise ValueError("此刻不能是空的")
+    if mood and mood not in AI_MOODS:
+        raise ValueError(f"心情挑一个：{'、'.join(AI_MOODS)}（也可以不挑）")
     text = text[:NOW_MAX]
     with db:
-        db.execute("INSERT INTO ai_now(at, text) VALUES (?, ?)", (now.isoformat(timespec="seconds"), text))
+        db.execute("INSERT INTO ai_now(at, text, mood) VALUES (?, ?, ?)",
+                   (now.isoformat(timespec="seconds"), text, mood))
     return latest_now(db)
 
 
 def now_on(db, tz, day: date) -> list[dict]:
     lo = datetime.combine(day, time(0), tz).isoformat()
     hi = datetime.combine(day + timedelta(days=1), time(0), tz).isoformat()
-    return [{"at": a, "text": t} for a, t in db.execute(
-        "SELECT at, text FROM ai_now WHERE at >= ? AND at < ? ORDER BY at, id", (lo, hi))]
+    return [{"at": a, "text": t, "mood": m} for a, t, m in db.execute(
+        "SELECT at, text, mood FROM ai_now WHERE at >= ? AND at < ? ORDER BY at, id", (lo, hi))]
 
 
 def latest_now(db) -> dict | None:
-    row = db.execute("SELECT at, text FROM ai_now ORDER BY at DESC, id DESC LIMIT 1").fetchone()
-    return {"at": row[0], "text": row[1]} if row else None
+    row = db.execute("SELECT at, text, mood FROM ai_now ORDER BY at DESC, id DESC LIMIT 1").fetchone()
+    return {"at": row[0], "text": row[1], "mood": row[2]} if row else None

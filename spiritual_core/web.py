@@ -428,14 +428,6 @@ def us_view(store: Store) -> dict:
                  for r in store.written_by_me(midnight, 40)]
     timeline.sort(key=lambda e: e["at"])
 
-    moods = {}
-    for m in store.mood_log(7):
-        moods[m["day"]] = m["mood"]                  # the day's last one wins
-    diaries = {r.event_date for r in store.timeline(days[0].isoformat(), today.isoformat(), ["diary"])}
-    week = [{"day": d.isoformat(), "mood": moods.get(d.isoformat()),
-             "asleep": (store.health_night(d) or {}).get("asleep"),
-             "diary": d.isoformat() in diaries} for d in days]
-
     # my last seven days: when I woke, when I wrote, and the last thing I said of myself
     me_days = []
     for d in reversed(days):
@@ -444,7 +436,17 @@ def us_view(store: Store) -> dict:
         nows = store.now_on(d)
         me_days.append({"day": d.isoformat(), "wakes": store.wakes_on(d),
                         "writes": [r.created_at for r in store.written_by_me(lo, 200, hi)],
-                        "now": nows[-1]["text"] if nows else None})
+                        "now": nows[-1]["text"] if nows else None,
+                        "mood": next((x["mood"] for x in reversed(nows) if x["mood"]), None)})
+
+    moods = {}
+    for m in store.mood_log(7):
+        moods[m["day"]] = m["mood"]                  # the day's last one wins
+    diaries = {r.event_date for r in store.timeline(days[0].isoformat(), today.isoformat(), ["diary"])}
+    my_moods = {x["day"]: x["mood"] for x in me_days}
+    week = [{"day": d.isoformat(), "mood": moods.get(d.isoformat()), "my_mood": my_moods.get(d.isoformat()),
+             "asleep": (store.health_night(d) or {}).get("asleep"),
+             "diary": d.isoformat() in diaries} for d in days]
 
     line = store.line_of_the_day()
     return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did, "timeline": timeline,

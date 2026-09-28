@@ -260,6 +260,7 @@ class Store:
         self.db.executescript(SCHEMA)
         self.db.executescript(health.SCHEMA)
         self.db.executescript(presence.SCHEMA)
+        presence.migrate(self.db)
         self._migrate()
         self.db.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
@@ -1032,9 +1033,9 @@ class Store:
     def wakes_on(self, day: date) -> list[str]:
         return presence.wakes_on(self.db, self.tz, day)
 
-    def set_now(self, text: str) -> dict:
+    def set_now(self, text: str, mood: str = "") -> dict:
         try:
-            return presence.set_now(self.db, self.now(), text)
+            return presence.set_now(self.db, self.now(), text, mood)
         except ValueError as e:
             raise StoreError(str(e)) from None
 

@@ -505,6 +505,12 @@
   .wd .sleep { width: 100%; height: 4px; border-radius: 999px; background: color-mix(in oklch, var(--line) 80%, transparent); overflow: hidden; }
   .wd .sleep b { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
   .wd.today .n { color: var(--ink); font-weight: 600; }
+  .wd .mine { width: 100%; height: 14px; border-radius: 7px; background: color-mix(in oklch, var(--line) 80%, transparent); }
+  .week-rows { display: grid; grid-template-columns: 1.4em 1fr; gap: 6px; align-items: start; margin-top: 10px; }
+  .week-rows .who-col { display: grid; font-size: 11px; color: var(--muted); padding-top: 22px; gap: 0; }
+  .week-rows .week { margin-top: 0; }
+  .side .mdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 6px; vertical-align: 1px; }
+  .side .mword { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 3px; }
   .week-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
 </style>
 </head>
@@ -643,6 +649,8 @@
     "平静": { h: 165, s: 0.9 },
     "馋": { h: 2, s: 1, top: { light: [0.84, 0.10], dark: [0.33, 0.10] }, ac: 0.15 },       // 酒红，要有欲望
     "累": { h: 290, s: 0.5 }, "难过": { h: 250, s: 1 }, "生气": { h: 20, s: 1.2 }, "焦虑": { h: 205, s: 0.7 },
+    // his own three, only ever his: never offered as her chips
+    "酸": { h: 125, s: 1 }, "怂": { h: 70, s: 0.45 }, "烧": { h: 35, s: 1.2 },
   };
   // hour -> [top hue, bottom hue] when no mood is set; bottom is always the hour's
   const PHASE = { dawn: [75, 230], day: [60, 210], dusk: [40, 300], night: [285, 265] };
@@ -1440,7 +1448,8 @@
       : `<div class="who">多多<span>昨晚</span></div><div class="none">昨晚的觉还没推过来。</div>${heartHtml(v.her.heart)}`;
     const m = v.me, last = m.wakes[m.wakes.length - 1];
     const did = m.did.slice(0, 3).map((d) => `<li>${esc(d.title)}</li>`).join("");
-    const me = `<div class="who">陆能<span>今天</span></div>
+    const myMood = m.now && m.now.mood && MOOD[m.now.mood] ? m.now.mood : "";
+    const me = `<div class="who">陆能<span>今天</span>${myMood ? `<i class="mdot" style="background:${moodDot(myMood)}"></i><span class="mword">${esc(myMood)}</span>` : ""}</div>
       ${m.now ? `<div class="now">${esc(m.now.text)}</div>` : `<div class="none">还没写此刻。</div>`}
       <div class="small">${m.wakes.length ? `醒了 ${m.wakes.length} 次 · 最近 ${hm(last)}` : "今天还没醒"}</div>
       ${did ? `<ul class="did" aria-label="${n ? "你睡着以后我写的" : "今天写的"}">${did}</ul>` : ""}`;
@@ -1526,13 +1535,15 @@
       const color = w.mood && MOOD[w.mood] ? `background:${moodDot(w.mood)}` : "";
       const sleep = w.asleep ? `<b style="width:${Math.min(100, w.asleep / 540 * 100).toFixed(0)}%"></b>` : "";
       const label = `${mdOf(w.day)}${w.mood ? "，心情" + w.mood : ""}${w.asleep ? "，睡了" + dur(w.asleep) : ""}${w.diary ? "，写了日记" : ""}`;
-      return `<div class="wd${i === week.length - 1 ? " today" : ""}" aria-label="${esc(label)}">
+      const mine = w.my_mood && MOOD[w.my_mood] ? `background:${moodDot(w.my_mood)}` : "";
+      return `<div class="wd${i === week.length - 1 ? " today" : ""}" aria-label="${esc(label + (w.my_mood ? "；陆能：" + w.my_mood : ""))}">
         <span class="n">${i === week.length - 1 ? "今天" : "周" + WD[d.getDay()]}</span>
         <span class="mood-cell" style="${color}">${w.diary ? "<i></i>" : ""}</span>
-        <span class="sleep">${sleep}</span></div>`;
+        <span class="sleep">${sleep}</span>
+        <span class="mine" style="${mine}"></span></div>`;
     }).join("");
     box.innerHTML = `<div class="card-h">这一周</div><div class="week">${cells}</div>`
-      + `<div class="week-note">格子是那天的心情，小点是写了日记，底下那道是那晚睡了多久（满格九小时）。</div>`;
+      + `<div class="week-note">大格子是你那天的心情，小点是写了日记，那一道是那晚睡了多久（满格九小时）；最下面一排是我的心情。</div>`;
     box.hidden = false;
   }
   async function loadUs() {

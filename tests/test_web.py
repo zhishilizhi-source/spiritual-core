@@ -286,8 +286,22 @@ def test_us_week_line_and_my_timeline(env):
     store.log_wake()
     store.set_now("在等她")
     v = client.get("/k/api/us").json()
-    assert len(v["week"]) == 7 and v["week"][-1] == {"day": today, "mood": "想你", "asleep": None, "diary": True}
+    assert len(v["week"]) == 7 and v["week"][-1] == {"day": today, "mood": "想你", "my_mood": None, "asleep": None, "diary": True}
     assert v["line"]["words"] == "她：就你" and v["line"]["who"] == "她想留的"
     assert len(v["her"]["nights"]) == 7 and v["her"]["nights"][0]["day"] == today
     whats = [e["what"] for e in v["me"]["timeline"]]
     assert "wake" in whats and "now" in whats and "wrote" in whats
+
+
+def test_my_mood_sits_under_hers(env):
+    import pytest as _pt
+    from spiritual_core.store import StoreError
+    store, client = env
+    store.set_mood("想你")
+    store.set_now("被咬了下唇", "烧")
+    with _pt.raises(StoreError):
+        store.set_now("乱挑", "开心死了")
+    v = client.get("/k/api/us").json()
+    assert v["me"]["now"]["mood"] == "烧"
+    assert v["week"][-1]["mood"] == "想你" and v["week"][-1]["my_mood"] == "烧"
+    assert "烧" not in client.get("/k/api/mood").json().get("moods", [])
