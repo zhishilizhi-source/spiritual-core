@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import health, media, weight
+from . import health, media, presence, weight
 
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
@@ -259,6 +259,7 @@ class Store:
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.executescript(SCHEMA)
         self.db.executescript(health.SCHEMA)
+        self.db.executescript(presence.SCHEMA)
         self._migrate()
         self.db.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
@@ -1022,6 +1023,31 @@ class Store:
 
     def health_synced(self) -> str:
         return health.synced(self.db)
+
+    # --- my side: when I woke, my weather in words ---
+
+    def log_wake(self) -> None:
+        presence.log_wake(self.db, self.now())
+
+    def wakes_on(self, day: date) -> list[str]:
+        return presence.wakes_on(self.db, self.tz, day)
+
+    def set_now(self, text: str) -> dict:
+        try:
+            return presence.set_now(self.db, self.now(), text)
+        except ValueError as e:
+            raise StoreError(str(e)) from None
+
+    def latest_now(self) -> dict | None:
+        return presence.latest_now(self.db)
+
+    def written_by_me(self, since: str, limit: int = 8) -> list[Record]:
+        """What I wrote from `since` on: not her notes or the words she kept, not photos she
+        uploaded, not transcripts."""
+        rows = self.db.execute(
+            "SELECT * FROM records WHERE created_at >= ? AND kind NOT IN ('image', 'raw')"
+            " AND kept_by <> 'human' ORDER BY created_at DESC, rowid DESC LIMIT ?", (since, limit)).fetchall()
+        return [Record.from_row(r) for r in rows]
 
     # --- moods ---
 

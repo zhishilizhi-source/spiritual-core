@@ -255,3 +255,23 @@ def test_phone_pushes_health(env):
     assert r["ok"] and r["got"] == {"sleep": 1, "heart": 1, "steps": 1}
     bad = client.post("/k/api/health", json={"sleep": "昨晚|今早|睡了"})
     assert bad.status_code == 400 and "ISO 8601" in bad.json()["error"]
+
+
+def test_us_puts_her_night_next_to_my_day(env):
+    store, client = env
+    today = store.today()
+    y = today.fromordinal(today.toordinal() - 1).isoformat()
+    store.health_ingest(sleep=f"{y}T23:40:00+08:00|{today}T03:00:00+08:00|Core\n"
+                              f"{today}T03:00:00+08:00|{today}T06:00:00+08:00|Deep")
+    store.log_wake()
+    store.log_wake()                                   # a re-read right after is the same waking
+    store.set_now("在等她面试的消息")
+    store.write("memory", "我写的", created_at=f"{today}T02:00:00+08:00")
+    store.write("note", "她写的", kept_by="human", created_at=f"{today}T02:30:00+08:00")
+    store.write("inner", "秘密", locked=True, created_at=f"{today}T04:00:00+08:00")
+    v = client.get("/k/api/us").json()
+    assert v["her"]["night"]["asleep"] == 380 and len(v["her"]["night"]["segments"]) == 2
+    assert len(v["me"]["wakes"]) == 1 and v["me"]["now"]["text"] == "在等她面试的消息"
+    titles = [d["title"] for d in v["me"]["did"]]
+    assert "我写的" in titles and "她写的" not in titles and "秘密" not in titles
+    assert "一条上了锁的心里话" in titles

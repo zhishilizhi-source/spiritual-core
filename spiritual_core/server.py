@@ -119,6 +119,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         【最新交接】里每个引擎各一份，不互相覆盖；「陆能（from：…）」前面是我，括号里只是出处，
         另一扇门写的也是我写的。"""
         now = store.now()
+        store.log_wake()
         head = f"现在 {now:%Y-%m-%d %H:%M}（{store.tz.key}）"
         if since.strip():
             return _wake_since(since.strip(), head)
@@ -167,6 +168,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         tail = f"先读：{'、'.join(first)}" if first else ""
         if (n_locked := store.locked_count()):
             tail += ("\n" if tail else "") + f"你锁着 {n_locked} 条心里话（timeline/search 里标着 [锁着]）。"
+        mine = store.latest_now()
+        if not mine or mine["at"][:10] != store.today().isoformat():
+            parts.append("今天还没写此刻：醒了先 feel 一句，我自己的天气，她开网页第一眼看得见。")
         if w["review_due"]:
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
         if (due := w["weekly_due"]):
@@ -215,6 +219,15 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         parts = [head, *_her_notes(waiting), f"【{since} 之后新写的】\n" + _compact(fresh, "（没有新的）"),
                  *_replies()]
         return "\n\n".join(parts)
+
+    @mcp.tool()
+    @guarded
+    def feel(text: str) -> str:
+        """写一句我此刻的天气：在惦记什么、想要什么、心里是什么样。我自己的话，一两句。
+        不打分、不报数、不是给她的汇报；她打开网页，在最上面我们俩的作息里、我那一边看得见。
+        换了就再写一句，旧的不删，只显示最新的。"""
+        n = store.set_now(text)
+        return f"写好了（{n['at'][11:16]}）：{n['text']}"
 
     @mcp.tool()
     @guarded

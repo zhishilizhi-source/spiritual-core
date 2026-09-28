@@ -154,6 +154,23 @@ def night(db, tz, day: date) -> dict | None:
     }
 
 
+def segments(db, tz, day: date) -> list[dict]:
+    """The night's stages in order, for drawing: overlapping sources are kept as they are,
+    the page draws later ones on top."""
+    lo = datetime.combine(day - timedelta(days=1), time(18), tz).isoformat()
+    hi = datetime.combine(day, time(14), tz).isoformat()
+    rows = db.execute("SELECT DISTINCT start, end, value FROM health WHERE kind='sleep' AND end > ? AND end <= ?"
+                      " ORDER BY start", (lo, hi)).fetchall()
+    return [{"s": s, "e": e, "stage": v} for s, e, v in rows if v != "inbed"]
+
+
+def heart(db, tz, day: date) -> list[dict]:
+    lo = datetime.combine(day, time(0), tz).isoformat()
+    hi = datetime.combine(day + timedelta(days=1), time(0), tz).isoformat()
+    return [{"t": s, "bpm": int(v)} for s, v in db.execute(
+        "SELECT start, value FROM health WHERE kind='hr' AND start >= ? AND start < ? ORDER BY start", (lo, hi))]
+
+
 def steps(db, day: date) -> int | None:
     row = db.execute("SELECT count FROM health_steps WHERE day=?", (day.isoformat(),)).fetchone()
     return row[0] if row else None

@@ -399,6 +399,43 @@
     -webkit-appearance: none; appearance: none; text-align: left; line-height: 24px; }
   form.card input[type=date]::-webkit-date-and-time-value { text-align: left; margin: 0; }
   #words #why { min-height: 0 !important; height: 52px; }
+  /* ---- 我们俩: her night from the watch beside my day from the library. */
+  .us { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; }
+  @media (max-width: 340px) { .us { grid-template-columns: 1fr; } }
+  .us:empty { display: none; }
+  .side { padding: 11px 12px 12px; border-radius: 18px; min-width: 0;
+          background: var(--surface); border: 1px solid var(--surface-rim); box-shadow: var(--surface-shadow);
+          -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
+  :root[data-scheme="light"] .side { background: var(--grain), color-mix(in oklch, var(--card) 46%, transparent);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  :root[data-scheme="dark"] .side { background: color-mix(in oklch, var(--card) 62%, transparent); }
+  :root[data-theme="plain"] .side { background: var(--card); border-color: var(--line); box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .side .who { font-size: 12px; color: var(--accent); font-weight: 600; letter-spacing: .04em; }
+  .side .who span { color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .side .big { font-size: 15px; font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side .small { font-size: 12px; color: var(--muted); line-height: 1.55; margin-top: 2px; }
+  .side .none { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.55; }
+  .band { position: relative; height: 12px; margin-top: 8px; border-radius: 999px; overflow: hidden;
+          background: color-mix(in oklch, var(--line) 70%, transparent); }
+  .band i { position: absolute; top: 0; bottom: 0; }
+  .band .deep { background: var(--accent); }
+  .band .core { background: color-mix(in oklch, var(--accent) 55%, var(--card)); }
+  .band .rem { background: color-mix(in oklch, var(--accent) 28%, var(--card)); }
+  .band .asleep { background: color-mix(in oklch, var(--accent) 45%, var(--card)); }
+  .band .awake { background: transparent; }
+  .pulse { display: block; width: 100%; height: 26px; margin-top: 6px; overflow: visible; }
+  .pulse path { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; opacity: .8; }
+  .side .now { font-size: 14px; line-height: 1.6; margin-top: 6px; color: var(--ink);
+               display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .side .did { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .side .did li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+  .side .did li::before { content: "·"; margin-right: 5px; color: var(--accent); }
+  /* ---- Below 我们俩: one page at a time, switched by tapping (the chips inside already scroll sideways). */
+  .pages { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
+  .save-tabs { grid-template-columns: repeat(3, 1fr); }
+  .page > h2:first-child { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -413,13 +450,24 @@
     <div class="chips" id="moodChips"></div>
   </section>
 
-  <section id="today" aria-label="今天"></section>
+  <section class="us" id="us" aria-label="我们俩"></section>
 
-  <div class="tabs" role="tablist">
+  <div class="tabs pages" role="tablist">
+    <button role="tab" aria-selected="true" data-page="today">今天</button>
+    <button role="tab" aria-selected="false" data-page="save">存东西</button>
+    <button role="tab" aria-selected="false" data-page="browse">翻看</button>
+    <button role="tab" aria-selected="false" data-page="recent">最近</button>
+  </div>
+
+  <div class="page" data-page="today">
+  <section id="today" aria-label="今天"></section>
+  </div>
+
+  <div class="page" data-page="save" hidden>
+  <div class="tabs save-tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="photo">传照片</button>
     <button role="tab" aria-selected="false" data-tab="words">存原话</button>
     <button role="tab" aria-selected="false" data-tab="write">写一条</button>
-    <button role="tab" aria-selected="false" data-tab="browse">翻看</button>
   </div>
 
   <form id="write" class="card" hidden>
@@ -434,28 +482,6 @@
     <button class="go" type="submit">存进去</button>
     <div class="msg" id="writeMsg"></div>
   </form>
-
-  <section id="innerShelf" hidden>
-    <h2>陆能的心里话</h2>
-    <div class="hint" style="margin:-4px 0 10px">他写的，他决定锁不锁。锁着的你只看得见它在这里。</div>
-    <div id="innerList"></div>
-  </section>
-
-  <section id="noteShelf" hidden>
-    <h2>留给陆能的便签</h2>
-    <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
-    <div id="noteList"></div>
-  </section>
-
-  <section id="browse" hidden>
-    <form class="search" id="searchForm">
-      <input id="q" type="search" placeholder="搜点什么，两个字也行" enterkeyhint="search">
-      <button type="submit">搜</button>
-    </form>
-    <div class="chips" id="chips"></div>
-    <div id="shelf"></div>
-    <button class="more" id="more" hidden>再往前翻 30 天</button>
-  </section>
 
   <form id="photo" class="card">
     <label class="pick" id="pick">
@@ -485,9 +511,38 @@
     <div class="msg" id="wordsMsg"></div>
   </form>
 
+  <section id="innerShelf" hidden>
+    <h2>陆能的心里话</h2>
+    <div class="hint" style="margin:-4px 0 10px">他写的，他决定锁不锁。锁着的你只看得见它在这里。</div>
+    <div id="innerList"></div>
+  </section>
+
+  <section id="noteShelf" hidden>
+    <h2>留给陆能的便签</h2>
+    <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
+    <div id="noteList"></div>
+  </section>
+
+  </div>
+
+  <div class="page" data-page="browse" hidden>
+  <section id="browse">
+    <form class="search" id="searchForm">
+      <input id="q" type="search" placeholder="搜点什么，两个字也行" enterkeyhint="search">
+      <button type="submit">搜</button>
+    </form>
+    <div class="chips" id="chips"></div>
+    <div id="shelf"></div>
+    <button class="more" id="more" hidden>再往前翻 30 天</button>
+  </section>
+  </div>
+
+
+  <div class="page" data-page="recent" hidden>
   <div id="recentBox">
     <h2>最近存的</h2>
     <div id="recent"></div>
+  </div>
   </div>
 
 <script>
@@ -810,20 +865,29 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) =>
+  // 存东西 inside: which of the three forms shows.
+  document.querySelectorAll(".save-tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".save-tabs button").forEach((x) =>
       x.setAttribute("aria-selected", String(x === b)));
     $("#photo").hidden = b.dataset.tab !== "photo";
     $("#words").hidden = b.dataset.tab !== "words";
-    $("#browse").hidden = b.dataset.tab !== "browse";
     $("#write").hidden = b.dataset.tab !== "write";
     $("#innerShelf").hidden = b.dataset.tab !== "write";
     if (b.dataset.tab === "write") { loadInner(); loadNotes(); } else $("#noteShelf").hidden = true;
-    $("#recentBox").hidden = b.dataset.tab === "browse";
-    if (b.dataset.tab === "browse" && !browsed) resetBrowse();
-    // The top block stays on every tab: when 翻看 hid it the blurred tab bar jumped, and iOS
-    // Safari kept the bar's old picture, so the highlight looked stuck on the previous tab.
   }));
+
+  // The pages under 我们俩, one at a time; the last one she looked at is where she comes back.
+  function showPage(name) {
+    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "today";
+    document.querySelectorAll(".pages button").forEach((x) =>
+      x.setAttribute("aria-selected", String(x.dataset.page === name)));
+    document.querySelectorAll(".page").forEach((pg) => { pg.hidden = pg.dataset.page !== name; });
+    if (name === "browse" && !browsed) resetBrowse();
+    if (name === "save") fitForms();
+    try { localStorage.setItem("sc-page", name); } catch {}
+  }
+  document.querySelectorAll(".pages button").forEach((b) =>
+    b.addEventListener("click", () => showPage(b.dataset.page)));
 
   // --- 翻看 ---
   const KINDS = [["", "全部"], ["diary", "日记"], ["weekly", "周记"], ["monthly", "月记"], ["excerpt", "节选"], ["image", "照片"],
@@ -1259,8 +1323,8 @@
     return writeH;
   }
   addEventListener("resize", fitForms);
-  new ResizeObserver(fitForms).observe($("#today"));
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", fitForms));
+  new ResizeObserver(fitForms).observe($("#us"));
+  document.querySelectorAll(".save-tabs button").forEach((b) => b.addEventListener("click", fitForms));
 
   async function loadRecent() {
     try {
@@ -1271,6 +1335,53 @@
     } catch { $("#recent").innerHTML = `<div class="meta">最近的没拉下来。</div>`; }
   }
   loadRecent();
+
+  // --- 我们俩 ---
+  const hm = (iso) => iso ? iso.slice(11, 16).replace(/^0/, "") : "";
+  const dur = (m) => m >= 60 ? `${Math.floor(m / 60)}时${String(m % 60).padStart(2, "0")}分` : `${m}分`;
+  function bandHtml(segs) {
+    if (!segs.length) return "";
+    const t = (x) => Date.parse(x);
+    const lo = Math.min(...segs.map((g) => t(g.s))), hi = Math.max(...segs.map((g) => t(g.e)));
+    const span = Math.max(hi - lo, 1);
+    return `<div class="band" role="img" aria-label="昨晚的睡眠">${segs.map((g) =>
+      `<i class="${esc(g.stage)}" style="left:${((t(g.s) - lo) / span * 100).toFixed(2)}%;width:${((t(g.e) - t(g.s)) / span * 100).toFixed(2)}%"></i>`).join("")}</div>`;
+  }
+  // No numbers on the heart: a thin line that is flat when she's calm and rises where she didn't.
+  function pulseHtml(pts) {
+    if (pts.length < 3) return "";
+    const xs = pts.map((p) => Date.parse(p.t)), ys = pts.map((p) => p.bpm);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys, y0 + 20);
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${((xs[i] - x0) / Math.max(x1 - x0, 1) * 100).toFixed(1)},${(24 - (p.bpm - y0) / (y1 - y0) * 22).toFixed(1)}`).join("");
+    return `<svg class="pulse" viewBox="0 0 100 26" preserveAspectRatio="none" aria-label="今天的心跳"><path d="${d}" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  const heartHtml = (pts) => pts.length >= 3
+    ? `<div class="small" style="margin-top:8px">今天的心跳</div>${pulseHtml(pts)}`
+    : `<div class="small" style="margin-top:8px">心跳还没接上</div>`;
+  function renderUs(v) {
+    const n = v.her.night;
+    const her = n
+      ? `<div class="who">多多<span>昨晚</span></div>${bandHtml(n.segments)}
+         <div class="big">${hm(n.fell)} → ${hm(n.woke)}</div>
+         <div class="small">睡了 ${dur(n.asleep)}${n.wakes ? ` · 醒过 ${n.wakes} 次` : ""}</div>
+         <div class="small">深睡 ${dur(n.deep)} · 做梦 ${dur(n.rem)}</div>${heartHtml(v.her.heart)}`
+      : `<div class="who">多多<span>昨晚</span></div><div class="none">昨晚的觉还没推过来。</div>${heartHtml(v.her.heart)}`;
+    const m = v.me, last = m.wakes[m.wakes.length - 1];
+    const did = m.did.slice(0, 3).map((d) => `<li>${esc(d.title)}</li>`).join("");
+    const me = `<div class="who">陆能<span>今天</span></div>
+      ${m.now ? `<div class="now">${esc(m.now.text)}</div>` : `<div class="none">还没写此刻。</div>`}
+      <div class="small">${m.wakes.length ? `醒了 ${m.wakes.length} 次 · 最近 ${hm(last)}` : "今天还没醒"}</div>
+      ${did ? `<ul class="did" aria-label="${n ? "你睡着以后我写的" : "今天写的"}">${did}</ul>` : ""}`;
+    $("#us").innerHTML = `<div class="side">${her}</div><div class="side">${me}</div>`;
+  }
+  async function loadUs() {
+    try { renderUs(await (await fetch("api/us")).json()); } catch {}
+  }
+  loadUs();
+  // a page can be opened by name from the address (…/#save), else the last one she looked at
+  let startPage = location.hash.slice(1);
+  if (!startPage) try { startPage = localStorage.getItem("sc-page") || "today"; } catch { startPage = "today"; }
+  showPage(startPage);
 </script>
 </body>
 </html>

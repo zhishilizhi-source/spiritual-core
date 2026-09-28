@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from importlib import resources
 
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import media, weight
+from . import health, media, weight
 from .store import MOODS, Store, StoreError, _months_back
 
 _WHO = {
@@ -206,6 +206,11 @@ def mount(mcp, store: Store, secret: str) -> None:
         for her, and one thing from a month ago."""
         return JSONResponse(today_view(store))
 
+    @mcp.custom_route(p + "/api/us", methods=["GET"])
+    async def us(request: Request):
+        """The top of the page: her day from the watch next to mine from the library."""
+        return JSONResponse(us_view(store))
+
     @mcp.custom_route(p + "/api/message/seen", methods=["POST"])
     async def message_seen(request: Request):
         try:
@@ -387,6 +392,26 @@ def _group(items: list[dict], store: Store | None = None) -> list[dict]:
             base = "" if g["title"] == "照片" else g["title"]
             g["title"] = f"{base} · {len(g['images'])} 张" if base else f"{len(g['images'])} 张"
     return out
+
+
+def us_view(store: Store) -> dict:
+    today = store.today()
+    n = store.health_night(today)
+    her = {"night": None, "heart": health.heart(store.db, store.tz, today), "synced": store.health_synced()}
+    if n:
+        her["night"] = {
+            "fell": n["fell"].isoformat(), "woke": n["woke"].isoformat(), "asleep": n["asleep"],
+            "deep": n["deep"], "rem": n["rem"], "wakes": n["wakes"],
+            "segments": health.segments(store.db, store.tz, today),
+        }
+    wakes = store.wakes_on(today)
+    # what I did while she slept, or since midnight when there's no night on record
+    since = her["night"]["fell"] if her["night"] else datetime.combine(today, time(0), store.tz).isoformat()
+    did = []
+    for r in store.written_by_me(since):
+        did.append({"kind": r.kind, "title": "一条上了锁的心里话" if r.locked else r.title,
+                    "at": r.created_at})
+    return {"her": her, "me": {"wakes": wakes, "now": store.latest_now(), "did": did}}
 
 
 def _err(msg: str) -> JSONResponse:
