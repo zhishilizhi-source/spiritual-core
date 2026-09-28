@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import media, weight
+from . import health, media, weight
 
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
@@ -258,6 +258,7 @@ class Store:
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.execute("PRAGMA journal_mode = WAL")
         self.db.executescript(SCHEMA)
+        self.db.executescript(health.SCHEMA)
         self._migrate()
         self.db.execute(
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
@@ -1004,6 +1005,23 @@ class Store:
             (kind, start, end),
         ).fetchone()
         return (start, end) if lived and not written else None
+
+    # --- her body, from the watch ---
+
+    def health_ingest(self, sleep: str = "", heart: str = "", steps: str = "") -> dict:
+        try:
+            return health.ingest(self.db, self.tz, sleep, heart, steps)
+        except health.HealthError as e:
+            raise StoreError(str(e)) from None
+
+    def health_night(self, day: date | None = None) -> dict | None:
+        return health.night(self.db, self.tz, day or self.today())
+
+    def health_steps(self, day: date) -> int | None:
+        return health.steps(self.db, day)
+
+    def health_synced(self) -> str:
+        return health.synced(self.db)
 
     # --- moods ---
 

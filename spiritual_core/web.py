@@ -72,6 +72,24 @@ def mount(mcp, store: Store, secret: str) -> None:
             return _err(str(e))
         return JSONResponse({"ok": True, "item": _item(rec)})
 
+    @mcp.custom_route(p + "/api/health", methods=["POST"])
+    async def health_in(request: Request):
+        """The phone's Shortcuts pushes the watch's numbers here. See health.py for the format."""
+        if int(request.headers.get("content-length") or 0) > 8 * 1024 * 1024:
+            return _err("太大了")
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError
+        except ValueError:
+            return _err("请求格式不对")
+        try:
+            got = store.health_ingest(str(body.get("sleep") or ""), str(body.get("heart") or ""),
+                                      str(body.get("steps") or ""))
+        except StoreError as e:
+            return _err(str(e))
+        return JSONResponse({"ok": True, "got": got})
+
     @mcp.custom_route(p + "/api/keep", methods=["POST"])
     async def keep(request: Request):
         try:

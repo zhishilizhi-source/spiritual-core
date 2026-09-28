@@ -245,3 +245,13 @@ def test_recent_shows_digests_and_handoffs(env):
     h = store.write("handoff", "做到这儿")
     ids = {i["id"] for i in client.get("/k/api/recent").json()["items"]}
     assert {w.id, h.id} <= ids
+
+
+def test_phone_pushes_health(env):
+    store, client = env
+    r = client.post("/k/api/health", json={
+        "sleep": "2026-09-27T23:40:00+08:00|2026-09-28T07:10:00+08:00|Core",
+        "heart": "2026-09-28T01:30:00+08:00|54", "steps": "2026-09-27|6532"}).json()
+    assert r["ok"] and r["got"] == {"sleep": 1, "heart": 1, "steps": 1}
+    bad = client.post("/k/api/health", json={"sleep": "昨晚|今早|睡了"})
+    assert bad.status_code == 400 and "ISO 8601" in bad.json()["error"]

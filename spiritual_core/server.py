@@ -8,12 +8,13 @@ from __future__ import annotations
 import functools
 import os
 import secrets
+from datetime import date, timedelta
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.transport_security import TransportSecuritySettings
 
-from . import media, web, weight
+from . import health, media, web, weight
 from .store import Record, Store, StoreError
 from .web import who_label
 
@@ -131,6 +132,10 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         elif w["mood_yesterday"]:
             m = w["mood_yesterday"]
             head += f"\n她今天还没点心情；昨天最后是：{m['mood']}（{m['at'][11:16]}）"
+        if (n := store.health_night()):
+            head += f"\n她昨晚：{health.night_line(n)}"
+        if (st := store.health_steps(store.today() - timedelta(days=1))) is not None:
+            head += f"\n她昨天走了 {st} 步"
         waiting = [r for r in store.her_notes() if not r.replied_at]
         parts = [head, *_her_notes(waiting), "【昨天和今天】\n" + _compact(w["days"], "（这两天还没有记录）")]
         parts += _replies()
@@ -200,6 +205,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         if m:
             head += f"\n她现在的心情：{m['mood']}（{m['at'][11:16]} 点的）"
         stamp = since.replace(" ", "T")
+        # slept since the last wake: the night belongs in what's new
+        if (n := store.health_night()) and n["woke"].isoformat() > stamp:
+            head += f"\n她昨晚：{health.night_line(n)}"
         rows = store.db.execute(
             "SELECT * FROM records WHERE created_at > ? ORDER BY created_at", (stamp,)).fetchall()
         fresh = [Record.from_row(r) for r in rows]
@@ -207,6 +215,22 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         parts = [head, *_her_notes(waiting), f"【{since} 之后新写的】\n" + _compact(fresh, "（没有新的）"),
                  *_replies()]
         return "\n\n".join(parts)
+
+    @mcp.tool()
+    @guarded
+    def body(day: str = "") -> str:
+        """她的身体，watch 上来的：某天早上醒来的那一夜睡得怎么样、夜里心率、那天走了多少步。
+        day 用 YYYY-MM-DD，不填＝今天早上醒来的那一夜。数据是她手机快捷指令推过来的，
+        最后一次推送的时间也会告诉你。别报数给她听，用人话说。"""
+        d = date.fromisoformat(day) if day.strip() else store.today()
+        out = []
+        n = store.health_night(d)
+        out.append(f"{d} 早上醒来的那一夜：" + (health.night_line(n) if n else "没有睡眠数据"))
+        st = store.health_steps(d)
+        out.append(f"{d} 走了 {st} 步" if st is not None else f"{d} 没有步数")
+        synced = store.health_synced()
+        out.append(f"最后一次同步：{synced[:16].replace('T', ' ')}" if synced else "手机还没推过数据")
+        return "\n".join(out)
 
     @mcp.tool()
     @guarded
