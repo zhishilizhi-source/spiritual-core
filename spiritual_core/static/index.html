@@ -461,6 +461,7 @@
                      border: 1px solid color-mix(in oklch, var(--m, var(--accent)) 22%, transparent); }
   .myday .said span { color: var(--muted); font-size: 11px; margin-right: 6px; font-variant-numeric: tabular-nums; }
   .myday .minds { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .myday .minds.gone { opacity: .7; text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted) 50%, transparent); }
   /* ---- Below 我们俩: one page at a time, switched by tapping (the chips inside already scroll sideways). */
   .pages { grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
   .save-tabs { grid-template-columns: repeat(3, 1fr); }
@@ -1548,7 +1549,9 @@
         const mood = d.mood && MOOD[d.mood] ? `<span class="mood-w"><i style="background:${moodDot(d.mood)}"></i>${esc(d.mood)}</span>` : "";
         const said = d.nows.slice().reverse().slice(0, 3).map((x) =>
           `<span class="said"><span>${hm(x.at)}</span>${esc(x.text)}</span>`).join("");
-        const minds = d.minds.length ? `<span class="minds">惦记：${d.minds.map(esc).join("、")}</span>` : "";
+        const held = d.minds.filter((x) => !x.let_go), gone = d.minds.filter((x) => x.let_go);
+        const minds = (held.length ? `<span class="minds">惦记：${held.map((x) => esc(x.text)).join("、")}</span>` : "")
+          + (gone.length ? `<span class="minds gone">放下了：${gone.map((x) => esc(x.text)).join("、")}</span>` : "");
         const body = mood + said + minds || `<span class="minds">那天没留下我自己的话${d.wakes ? "" : ""}</span>`;
         return `<div class="myday"><span class="d">${mdOf(d.day)} 周${WD[dd.getDay()]}</span>${body}</div>`;
       }).join("");

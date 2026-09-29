@@ -106,12 +106,12 @@ def open_minds(db) -> list[dict]:
         "SELECT id, at, text FROM ai_mind WHERE done_at='' ORDER BY at, id")]
 
 
-def minds_on(db, tz, day: date) -> list[str]:
-    """What was on my mind at some point that day."""
+def minds_on(db, tz, day: date) -> list[dict]:
+    """What was on my mind at some point that day, and whether I let it go that same day."""
     lo = datetime.combine(day, time(0), tz).isoformat()
     hi = datetime.combine(day + timedelta(days=1), time(0), tz).isoformat()
-    return [t for (t,) in db.execute(
-        "SELECT text FROM ai_mind WHERE at < ? AND (done_at='' OR done_at >= ?) ORDER BY at, id", (hi, lo))]
+    return [{"text": t, "let_go": bool(d) and d < hi} for t, d in db.execute(
+        "SELECT text, done_at FROM ai_mind WHERE at < ? AND (done_at='' OR done_at >= ?) ORDER BY at, id", (hi, lo))]
 
 
 def now_on(db, tz, day: date) -> list[dict]:

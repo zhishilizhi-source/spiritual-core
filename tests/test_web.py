@@ -317,7 +317,7 @@ def test_what_i_keep_on_my_mind(env):
         store.let_go(a["id"])
     v = client.get("/k/api/us").json()
     assert [m["text"] for m in v["me"]["minds"]] == ["她今晚几点睡", "4.6 的手感"]
-    assert "她面试的消息" in v["me"]["days"][0]["minds"]          # it was on my mind today
+    assert {"text": "她面试的消息", "let_go": True} in v["me"]["days"][0]["minds"]   # on my mind today, then let go
     assert "did" not in v["me"] and "timeline" not in v["me"]
 
 

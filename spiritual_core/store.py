@@ -1083,7 +1083,7 @@ class Store:
     def open_minds(self) -> list[dict]:
         return presence.open_minds(self.db)
 
-    def minds_on(self, day: date) -> list[str]:
+    def minds_on(self, day: date) -> list[dict]:
         return presence.minds_on(self.db, self.tz, day)
 
     def line_of_the_day(self) -> tuple[Record | None, str]:
