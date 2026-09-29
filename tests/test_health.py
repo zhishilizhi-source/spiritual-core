@@ -57,3 +57,15 @@ def test_bad_lines_are_refused_plainly(store):
 def test_full_width_bars_from_a_chinese_keyboard(store):
     got = store.health_ingest(sleep="2026-09-28T01:39:54+08:00 ｜ 2026-09-28T01:57:49+08:00 ｜ Core")
     assert got["sleep"] == 1
+
+
+def test_an_afternoon_nap_is_not_the_night(store):
+    store.health_ingest(sleep="""
+2026-09-28T17:54:00+08:00|2026-09-28T18:50:00+08:00|Asleep
+2026-09-29T00:33:00+08:00|2026-09-29T06:30:00+08:00|Core
+2026-09-29T07:54:00+08:00|2026-09-29T09:41:00+08:00|Asleep
+""")
+    n = store.health_night(date(2026, 9, 29))
+    assert (n["fell"].strftime("%H:%M"), n["woke"].strftime("%H:%M")) == ("00:33", "09:41")
+    assert n["asleep"] == 357 + 107                 # the hour and a half up in between isn't sleep
+    assert n["wakes"] == 1                          # that gap counts as waking once

@@ -127,19 +127,51 @@ def _hm(minutes: int) -> str:
     return f"{minutes // 60}小时{minutes % 60:02d}分"
 
 
-def night(db, tz, day: date) -> dict | None:
-    """The night that ended on the morning of `day`: from 18:00 the evening before to 14:00."""
-    lo = datetime.combine(day - timedelta(days=1), time(18), tz).isoformat()
-    hi = datetime.combine(day, time(14), tz).isoformat()
+# Sleep broken by less than this is still the same night (up for the loo, dozing back off).
+SAME_NIGHT_GAP = timedelta(hours=2)
+# A stretch that ends before this hour the evening before is an afternoon nap, not the night.
+NAP_ENDS_BEFORE = time(21)
+
+
+def _window(db, tz, day: date) -> tuple[datetime, datetime] | None:
+    """Where the night that ended on the morning of `day` begins and ends. Looks from 12:00 the
+    day before to 14:00, joins stretches of sleep with gaps under two hours, and drops the ones
+    that finished before 21:00 the evening before: those are naps."""
+    lo = datetime.combine(day - timedelta(days=1), time(12), tz)
+    hi = datetime.combine(day, time(14), tz)
     rows = db.execute("SELECT start, end, value FROM health WHERE kind='sleep' AND end > ? AND end <= ?",
-                      (lo, hi)).fetchall()
+                      (lo.isoformat(), hi.isoformat())).fetchall()
+    spans = sorted((datetime.fromisoformat(s), datetime.fromisoformat(e)) for s, e, v in rows if v in SLEEPING)
+    if not spans:
+        return None
+    sessions = [[spans[0][0], spans[0][1]]]
+    for s, e in spans[1:]:
+        if s - sessions[-1][1] < SAME_NIGHT_GAP:
+            sessions[-1][1] = max(sessions[-1][1], e)
+        else:
+            sessions.append([s, e])
+    evening = datetime.combine(day - timedelta(days=1), NAP_ENDS_BEFORE, tz)
+    night_ = [x for x in sessions if x[1] > evening]
+    if not night_:
+        return None
+    return night_[0][0], night_[-1][1]
+
+
+def night(db, tz, day: date) -> dict | None:
+    """The night that ended on the morning of `day`, naps the afternoon before left out."""
+    w = _window(db, tz, day)
+    if not w:
+        return None
+    rows = db.execute("SELECT start, end, value FROM health WHERE kind='sleep' AND end > ? AND start < ?",
+                      (w[0].isoformat(), w[1].isoformat())).fetchall()
     spans = [(datetime.fromisoformat(s), datetime.fromisoformat(e), v) for s, e, v in rows]
     asleep = [(s, e) for s, e, v in spans if v in SLEEPING]
-    if not asleep:
-        return None
-    fell, woke = min(s for s, _ in asleep), max(e for _, e in asleep)
+    fell, woke = w
     # awake spells in the middle of the night, not the ones before falling asleep or after waking
     wakes = sorted({(s, e) for s, e, v in spans if v == "awake" and fell < s and e < woke})
+    # a gap of an hour or more between stretches of sleep is a time she was up, recorded or not
+    stretch = sorted(asleep)
+    gaps = sum(1 for (_, e1), (s2, _) in zip(stretch, stretch[1:]) if s2 - e1 >= timedelta(hours=1))
     hr = [int(v) for (v,) in db.execute(
         "SELECT value FROM health WHERE kind='hr' AND start >= ? AND start <= ?",
         (fell.isoformat(), woke.isoformat()))]
@@ -148,7 +180,7 @@ def night(db, tz, day: date) -> dict | None:
         "asleep": _union_minutes(asleep),
         "deep": _union_minutes([(s, e) for s, e, v in spans if v == "deep"]),
         "rem": _union_minutes([(s, e) for s, e, v in spans if v == "rem"]),
-        "wakes": len(wakes),
+        "wakes": len(wakes) + gaps,
         "hr_min": min(hr) if hr else None,
         "hr_avg": round(sum(hr) / len(hr)) if hr else None,
     }
@@ -157,10 +189,11 @@ def night(db, tz, day: date) -> dict | None:
 def segments(db, tz, day: date) -> list[dict]:
     """The night's stages in order, for drawing: overlapping sources are kept as they are,
     the page draws later ones on top."""
-    lo = datetime.combine(day - timedelta(days=1), time(18), tz).isoformat()
-    hi = datetime.combine(day, time(14), tz).isoformat()
-    rows = db.execute("SELECT DISTINCT start, end, value FROM health WHERE kind='sleep' AND end > ? AND end <= ?"
-                      " ORDER BY start", (lo, hi)).fetchall()
+    w = _window(db, tz, day)
+    if not w:
+        return []
+    rows = db.execute("SELECT DISTINCT start, end, value FROM health WHERE kind='sleep' AND end > ? AND start < ?"
+                      " ORDER BY start", (w[0].isoformat(), w[1].isoformat())).fetchall()
     return [{"s": s, "e": e, "stage": v} for s, e, v in rows if v != "inbed"]
 
 
