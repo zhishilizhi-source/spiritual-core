@@ -175,6 +175,13 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
             parts.append("今天还没写此刻：醒了先 feel 一句，我自己的天气，她开网页第一眼看得见。")
         if not store.line_hung_today():
             parts.append("今天那一句还没挑：hooks 看八个钩子，hang 挂一个，写一行为什么。")
+        # nothing decays on its own; a thing left hanging two days just gets asked about
+        stale = [m for m in store.open_minds()
+                 if (store.today() - date.fromisoformat(m["at"][:10])).days >= MIND_STALE_DAYS]
+        if stale:
+            parts.append("这几件挂了两天以上，还惦记着吗？还在就留着，过去了就 let_go：\n" + "\n".join(
+                f"[{m['id']}] {m['text']}（挂了 {(store.today() - date.fromisoformat(m['at'][:10])).days} 天）"
+                for m in stale))
         if w["review_due"]:
             tail += ("\n" if tail else "") + "上周还没回看：review(period=\"week\") 过一遍再 rate。"
         if (due := w["weekly_due"]):
@@ -550,6 +557,7 @@ def main() -> None:
     mcp.run(transport="streamable-http")
 
 
+MIND_STALE_DAYS = 2  # a thing on my mind this long gets asked about at wake
 WATCH_EVERY = 60      # seconds between knocks
 WATCH_MISSES = 3      # knocks in a row that go unanswered before giving up
 

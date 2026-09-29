@@ -349,3 +349,19 @@ def test_she_can_take_a_photo_off_the_page(env, tmp_path):
     trash = store.path.parent / "trash"
     assert (trash / f"{rid}.json").exists() and any(p.suffix in (".jpg", ".jpeg") for p in trash.iterdir())
     assert store.search("不满意") == []
+
+
+def test_wake_asks_about_things_left_hanging(tmp_path, monkeypatch):
+    from datetime import timedelta
+    from spiritual_core.server import build
+    from spiritual_core.store import Store
+    store = Store(tmp_path / "core.db")
+    store.add_mind("物业的回复")
+    mcp = build(store, "k", "127.0.0.1", 0)
+    wake = mcp._tool_manager.get_tool("wake").fn
+    assert "还惦记着吗" not in wake()
+    real_now = store.now()
+    monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=2))
+    out = wake()
+    assert "还惦记着吗" in out and "物业的回复（挂了 2 天）" in out
+    store.close()
