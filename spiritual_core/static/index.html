@@ -1296,8 +1296,9 @@
   function preview(f) {
     const video = f.type.startsWith("video/");
     const el = document.createElement(video ? "video" : "img");
-    el.src = URL.createObjectURL(f);
-    if (video) { el.muted = true; el.playsInline = true; el.preload = "metadata"; }
+    // iPhone Safari leaves a fresh video blank until it plays; asking for a moment past 0 makes it paint that frame.
+    el.src = URL.createObjectURL(f) + (video ? "#t=0.1" : "");
+    if (video) { el.muted = true; el.playsInline = true; el.preload = "auto"; }
     return el;
   }
   fileInput.addEventListener("change", () => {
