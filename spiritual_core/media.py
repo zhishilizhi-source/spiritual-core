@@ -1,4 +1,4 @@
-"""Image handling. Originals are kept byte-for-byte; resizing only happens on the way out."""
+"""Image and short-video handling. Originals are kept byte-for-byte; resizing only happens on the way out."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from datetime import datetime
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+# Videos are for the few clips worth keeping, not a storage room; also keeps the weekly git backup small.
+MAX_VIDEO_BYTES = 50 * 1024 * 1024
 # Long side sent to a model; larger images cost tokens without adding much.
 MODEL_MAX_SIDE = 1568
 THUMB_MAX_SIDE = 480
@@ -36,9 +38,27 @@ class Probe:
     taken_on: str | None  # YYYY-MM-DD from EXIF, when the camera recorded it
 
 
+def is_video(mime: str) -> bool:
+    return (mime or "").startswith("video/")
+
+
+def _sniff_video(data: bytes) -> tuple[str, str] | None:
+    """MP4 and QuickTime carry an 'ftyp' box at byte 4; WebM starts with the EBML magic."""
+    if data[4:8] == b"ftyp":
+        return ("mov", "video/quicktime") if data[8:10] == b"qt" else ("mp4", "video/mp4")
+    if data[:4] == b"\x1a\x45\xdf\xa3":
+        return "webm", "video/webm"
+    return None
+
+
 def probe(data: bytes) -> Probe:
     if not data:
-        raise MediaError("图片是空的")
+        raise MediaError("文件是空的")
+    video = _sniff_video(data)
+    if video:
+        if len(data) > MAX_VIDEO_BYTES:
+            raise MediaError(f"视频太大了，上限 {MAX_VIDEO_BYTES // 1024 // 1024}MB，只放值得记住的那几秒")
+        return Probe(video[0], video[1], 0, 0, None)
     if len(data) > MAX_UPLOAD_BYTES:
         raise MediaError(f"图片太大了，上限 {MAX_UPLOAD_BYTES // 1024 // 1024}MB")
     try:
@@ -81,3 +101,19 @@ def render(data: bytes, max_side: int) -> bytes:
         out = io.BytesIO()
         im.save(out, "JPEG", quality=85)
         return out.getvalue()
+
+
+def video_tile(max_side: int = THUMB_MAX_SIDE) -> bytes:
+    """Stand-in thumbnail for a video (no ffmpeg here to grab a frame): a dark tile with a play mark."""
+    from PIL import ImageDraw
+    w, h = max_side, max_side * 3 // 4
+    im = Image.new("RGB", (w, h), (46, 42, 52))
+    d = ImageDraw.Draw(im)
+    r = h // 5
+    cx, cy = w // 2, h // 2
+    d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(236, 228, 240), width=max(2, r // 10))
+    t = r // 2
+    d.polygon([(cx - t * 2 // 3, cy - t), (cx - t * 2 // 3, cy + t), (cx + t, cy)], fill=(236, 228, 240))
+    out = io.BytesIO()
+    im.save(out, "JPEG", quality=85)
+    return out.getvalue()

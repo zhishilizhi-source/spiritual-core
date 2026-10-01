@@ -534,12 +534,14 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
 
     @mcp.tool()
     def view_image(id: str) -> list:
-        """看一张照片本身（不是只看说明）。id 从 timeline / search / read 里拿，kind 是 image 的那种。"""
+        """看一张照片本身（不是只看说明）。id 从 timeline / search / read 里拿，kind 是 image 的那种。视频只给说明。"""
         try:
             r, info, data = store.image(id)
         except (StoreError, FileNotFoundError) as e:
             return [f"没做成：{e}"]
         caption = f"[{r.id}] {r.event_date} · {r.body}"
+        if media.is_video(info["mime"]):
+            return [caption + "\n（这是一段视频，我这边看不了画面，只能读说明。）"]
         return [caption, Image(data=media.render(data, media.MODEL_MAX_SIDE), format="jpeg")]
 
     web.mount(mcp, store, secret)

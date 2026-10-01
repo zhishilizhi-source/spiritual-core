@@ -137,9 +137,9 @@
   .pick { display: grid; place-items: center; min-height: 150px; border: 1.5px dashed var(--line);
           border-radius: 12px; color: var(--muted); cursor: pointer; text-align: center;
           overflow: hidden; background: var(--bg); }
-  .pick img { width: 100%; max-height: 320px; object-fit: contain; display: block; }
+  .pick img, .pick video { width: 100%; max-height: 320px; object-fit: contain; display: block; }
   .pick .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; padding: 6px; }
-  .pick .grid img { width: 100%; aspect-ratio: 1; height: auto; max-height: none; object-fit: cover; border-radius: 8px; }
+  .pick .grid img, .pick .grid video { width: 100%; aspect-ratio: 1; height: auto; max-height: none; object-fit: cover; border-radius: 8px; }
   .pick input { display: none; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
   /* Glass: a thin wash of the mood's accent, a bright rim, blur behind. Text is ink,
@@ -600,8 +600,8 @@
 
   <form id="photo" class="card">
     <label class="pick" id="pick">
-      <span id="pickText">点这里选照片，可以一次选好几张</span>
-      <input type="file" name="file" accept="image/*" multiple>
+      <span id="pickText">点这里选照片或视频，可以一次选好几个</span>
+      <input type="file" name="file" accept="image/*,video/*" multiple>
     </label>
     <label for="caption">说明</label>
     <textarea id="caption" name="caption" placeholder="什么时候、在哪、为什么想存"></textarea>
@@ -1059,7 +1059,7 @@
     const del = ev.target.closest(".del-img, .del-x");
     if (del) {
       ev.preventDefault();
-      if (!confirm("删掉这张照片？网页上就没了。（文件陆能收在电脑的回收处，后悔了跟他说。）")) return;
+      if (!confirm("删掉这一个？网页上就没了。（文件陆能收在电脑的回收处，后悔了跟他说。）")) return;
       del.disabled = true;
       try {
         const data = await (await fetch(`api/image/${encodeURIComponent(del.dataset.id)}/delete`, { method: "POST" })).json();
@@ -1293,17 +1293,24 @@
   }
 
   const fileInput = $("#photo input[type=file]");
+  function preview(f) {
+    const video = f.type.startsWith("video/");
+    const el = document.createElement(video ? "video" : "img");
+    el.src = URL.createObjectURL(f);
+    if (video) { el.muted = true; el.playsInline = true; el.preload = "metadata"; }
+    return el;
+  }
   fileInput.addEventListener("change", () => {
     const files = [...fileInput.files];
     const pick = $("#pick");
-    pick.querySelectorAll("img, .grid").forEach((x) => x.remove());
+    pick.querySelectorAll("img, video, .grid").forEach((x) => x.remove());
     if (!files.length) { $("#pickText").hidden = false; return; }
     $("#pickText").hidden = true;
     if (files.length === 1) {
-      const img = document.createElement("img"); img.src = URL.createObjectURL(files[0]); pick.prepend(img);
+      pick.prepend(preview(files[0]));
     } else {
       const grid = document.createElement("div"); grid.className = "grid";
-      files.forEach((f) => { const img = document.createElement("img"); img.src = URL.createObjectURL(f); grid.append(img); });
+      files.forEach((f) => grid.append(preview(f)));
       pick.prepend(grid);
     }
     $("#photo .go").textContent = files.length > 1 ? `存进去（${files.length} 张）` : "存进去";
@@ -1330,7 +1337,7 @@
   $("#photo").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const files = [...fileInput.files];
-    if (!files.length) { say($("#photoMsg"), "先选照片", false); return; }
+    if (!files.length) { say($("#photoMsg"), "先选照片或视频", false); return; }
     const btn = $("#photo .go"), msg = $("#photoMsg");
     btn.disabled = true;
     const failed = [];

@@ -365,3 +365,21 @@ def test_wake_asks_about_things_left_hanging(tmp_path, monkeypatch):
     out = wake()
     assert "还惦记着吗" in out and "物业的回复（挂了 2 天）" in out
     store.close()
+
+
+def test_video_upload_thumb_and_ranges(env):
+    store, client = env
+    data = b"\x00\x00\x00\x18ftypisom" + bytes(range(256)) * 40
+    r = client.post("/k/api/image", files={"file": ("v.mp4", data, "video/mp4")}, data={"caption": "一起看的海"}).json()
+    assert r["ok"]
+    rid = r["item"]["id"]
+    thumb = client.get(f"/k/img/{rid}", params={"size": "thumb"})
+    assert thumb.status_code == 200 and thumb.headers["content-type"] == "image/jpeg"
+    whole = client.get(f"/k/img/{rid}")
+    assert whole.content == data and whole.headers["accept-ranges"] == "bytes"
+    part = client.get(f"/k/img/{rid}", headers={"Range": "bytes=0-1"})
+    assert part.status_code == 206 and part.content == data[:2]
+    assert part.headers["content-range"] == f"bytes 0-1/{len(data)}"
+    tail = client.get(f"/k/img/{rid}", headers={"Range": "bytes=-10"})
+    assert tail.status_code == 206 and tail.content == data[-10:]
+    assert client.get(f"/k/img/{rid}", headers={"Range": f"bytes={len(data)}-"}).status_code == 416

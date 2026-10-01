@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime, time, timedelta
 from importlib import resources
 
@@ -53,13 +54,14 @@ def mount(mcp, store: Store, secret: str) -> None:
 
     @mcp.custom_route(p + "/api/image", methods=["POST"])
     async def upload(request: Request):
+        cap = max(media.MAX_UPLOAD_BYTES, media.MAX_VIDEO_BYTES)
         size = int(request.headers.get("content-length") or 0)
-        if size > media.MAX_UPLOAD_BYTES + 1024 * 1024:
-            return _err("图片太大了")
-        form = await request.form(max_part_size=media.MAX_UPLOAD_BYTES + 1)
+        if size > cap + 1024 * 1024:
+            return _err(f"文件太大了，视频上限 {media.MAX_VIDEO_BYTES // 1024 // 1024}MB，照片 {media.MAX_UPLOAD_BYTES // 1024 // 1024}MB")
+        form = await request.form(max_part_size=cap + 1)
         file = form.get("file")
         if file is None or isinstance(file, str):
-            return _err("没收到图片")
+            return _err("没收到文件")
         data = await file.read()
         try:
             rec = store.add_image(
@@ -315,9 +317,12 @@ def mount(mcp, store: Store, secret: str) -> None:
         except (StoreError, FileNotFoundError):
             return Response(status_code=404)
         headers = {"Cache-Control": "private, max-age=86400"}
+        video = media.is_video(info["mime"])
         if request.query_params.get("size") == "thumb":
-            return Response(media.render(data, media.THUMB_MAX_SIDE), media_type="image/jpeg",
-                            headers=headers)
+            thumb = media.video_tile() if video else media.render(data, media.THUMB_MAX_SIDE)
+            return Response(thumb, media_type="image/jpeg", headers=headers)
+        if video:
+            return _ranged(request, data, info["mime"], headers)
         return Response(data, media_type=info["mime"], headers=headers)
 
 
@@ -371,6 +376,24 @@ def _item(r, weighed: dict | None = None) -> dict:
     if weighed and r.id in weighed:
         item["score"], item["layer"] = weighed[r.id]
     return item
+
+
+def _ranged(request: Request, data: bytes, mime: str, headers: dict) -> Response:
+    """Phones (Safari especially) only play a video when the server answers byte-range requests."""
+    headers = dict(headers, **{"Accept-Ranges": "bytes"})
+    total = len(data)
+    m = re.fullmatch(r"bytes=(\d*)-(\d*)", (request.headers.get("range") or "").strip())
+    if not m or (not m[1] and not m[2]):
+        return Response(data, media_type=mime, headers=headers)
+    if m[1]:
+        start = int(m[1])
+        end = min(int(m[2]), total - 1) if m[2] else total - 1
+    else:
+        start, end = max(0, total - int(m[2])), total - 1
+    if start >= total or start > end:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+    headers["Content-Range"] = f"bytes {start}-{end}/{total}"
+    return Response(data[start:end + 1], status_code=206, media_type=mime, headers=headers)
 
 
 def _group(items: list[dict], store: Store | None = None) -> list[dict]:

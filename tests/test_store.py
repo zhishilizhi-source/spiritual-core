@@ -243,3 +243,26 @@ def test_monthly_due(store, monkeypatch):
     assert store.monthly_due() == ("2026-09-01", "2026-09-30")
     store.write("monthly", "写了", event_date="2026-09-30")
     assert store.monthly_due() is None
+
+
+def _mp4(size=4096, brand=b"isom"):
+    return b"\x00\x00\x00\x18ftyp" + brand + b"\x00" * (size - 12)
+
+
+def test_video_kept_as_original_with_its_own_title(store):
+    from spiritual_core import media
+    rec = store.add_image(_mp4(), event_date="2026-10-01")
+    assert rec.kind == "image" and rec.title == "视频"
+    _, info, raw = store.image(rec.id)
+    assert raw == _mp4() and info["mime"] == "video/mp4" and info["file"].endswith(".mp4")
+    mov = store.add_image(_mp4(brand=b"qt  "), caption="她笑的那几秒")
+    assert store.image(mov.id)[1]["mime"] == "video/quicktime" and mov.title == "她笑的那几秒"
+    webm = store.add_image(b"\x1a\x45\xdf\xa3" + b"\x00" * 100)
+    assert store.image(webm.id)[1]["mime"] == "video/webm"
+    assert media.video_tile()[:2] == b"\xff\xd8"
+
+
+def test_video_over_limit_is_refused(store):
+    from spiritual_core import media
+    with pytest.raises(StoreError, match="50MB"):
+        store.add_image(_mp4(media.MAX_VIDEO_BYTES + 1))

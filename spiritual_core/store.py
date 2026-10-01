@@ -667,7 +667,7 @@ class Store:
         caption = (caption or "").replace("\r\n", "\n").strip()
         event_date = event_date or info.taken_on
         body = caption or "（没写说明）"
-        title = caption.splitlines()[0][:40] if caption else "照片"
+        title = caption.splitlines()[0][:40] if caption else ("视频" if media.is_video(info.mime) else "照片")
         rec = self.write("image", body, event_date, title, tags)
         name = f"{rec.id}.{info.ext}"
         (self.images_dir / name).write_bytes(data)
@@ -687,7 +687,7 @@ class Store:
         (with any revisions and links) go to data/trash/, from where it can be put back."""
         rec = self.get(rid)
         if rec.kind != "image":
-            raise StoreError("只有照片能从网页上删")
+            raise StoreError("只有照片和视频能从网页上删")
         row = self.db.execute("SELECT * FROM images WHERE record_id=?", (rid,)).fetchone()
         trash = self.path.parent / "trash"
         trash.mkdir(exist_ok=True)
