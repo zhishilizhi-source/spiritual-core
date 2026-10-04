@@ -534,7 +534,9 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
 
     @mcp.tool()
     def view_image(id: str) -> list:
-        """看一张照片本身（不是只看说明）。id 从 timeline / search / read 里拿，kind 是 image 的那种。视频只给说明。"""
+        """看一张照片本身（不是只看说明）。id 从 timeline / search / read 里拿，kind 是 image 的那种。视频只给说明。
+        私密照片（kind=intimate 或标了 private）只返回文字描述，不返回图片——remote 同步看不到原图。
+        想看原图在本机浏览器打开返回的链接。"""
         try:
             r, info, data = store.image(id)
         except (StoreError, FileNotFoundError) as e:
@@ -542,6 +544,10 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         caption = f"[{r.id}] {r.event_date} · {r.body}"
         if media.is_video(info["mime"]):
             return [caption + "\n（这是一段视频，我这边看不了画面，只能读说明。）"]
+        private = r.kind == "intimate" or "private" in r.tags
+        if private:
+            local_url = f"http://{host}:{port}/{secret}/img/{r.id}"
+            return [caption + f"\n（私密照片，只给文字描述，原图不走会话。本机看原图：{local_url}）"]
         return [caption, Image(data=media.render(data, media.MODEL_MAX_SIDE), format="jpeg")]
 
     web.mount(mcp, store, secret)
