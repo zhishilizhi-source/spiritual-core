@@ -383,3 +383,13 @@ def test_video_upload_thumb_and_ranges(env):
     tail = client.get(f"/k/img/{rid}", headers={"Range": "bytes=-10"})
     assert tail.status_code == 206 and tail.content == data[-10:]
     assert client.get(f"/k/img/{rid}", headers={"Range": f"bytes={len(data)}-"}).status_code == 416
+
+
+def test_she_can_unpin_and_pin_back(env):
+    store, client = env
+    r = store.write("anchor", "醒来先认的", title="锚", pinned=True)
+    assert client.get("/k/api/browse").json()["items"][0]["pinned"] is True
+    res = client.post(f"/k/api/pin/{r.id}", json={"pinned": False}).json()
+    assert res["ok"] and res["item"]["pinned"] is False and store.pinned() == []
+    assert client.post(f"/k/api/pin/{r.id}", json={"pinned": True}).json()["item"]["pinned"] is True
+    assert client.post("/k/api/pin/nope", json={"pinned": False}).status_code == 400

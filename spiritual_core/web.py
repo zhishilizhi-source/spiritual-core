@@ -151,6 +151,20 @@ def mount(mcp, store: Store, secret: str) -> None:
             return _err("请求格式不对")
         return JSONResponse({"ok": True, "item": _item(rec)})
 
+    @mcp.custom_route(p + "/api/pin/{rid}", methods=["POST"])
+    async def pin(request: Request):
+        """Her unpin (and pin back): pinned ones show in every wake."""
+        try:
+            body = await request.json()
+            if store.get(request.path_params["rid"]).locked:
+                return _err("锁着的动不了")
+            rec = store.set_pinned(request.path_params["rid"], bool(body.get("pinned")))
+        except StoreError as e:
+            return _err(str(e))
+        except (ValueError, AttributeError):
+            return _err("请求格式不对")
+        return JSONResponse({"ok": True, "item": _item(rec)})
+
     @mcp.custom_route(p + "/api/edit/{rid}", methods=["POST"])
     async def edit(request: Request):
         """Her fixes: title, text, date. The previous version is kept."""
@@ -368,7 +382,7 @@ def _item(r, weighed: dict | None = None) -> dict:
     item = {
         "id": r.id, "kind": r.kind, "event_date": r.event_date, "created_at": r.created_at,
         "title": r.title, "body": r.body, "why": r.why, "status": r.status,
-        "kept_by": who_label(r),
+        "kept_by": who_label(r), "pinned": r.pinned,
         "weight": weight.effective(r), "hers": r.human_rating, "reads": r.read_count,
         "unlocked_at": r.unlocked_at, "batch": r.batch,
         "seen_at": r.seen_at, "reply": r.reply, "replied_at": r.replied_at,

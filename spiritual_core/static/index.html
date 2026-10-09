@@ -1069,6 +1069,21 @@
       } catch (e) { alert(e.message || "没删掉"); del.disabled = false; }
       return;
     }
+    const pinBtn = ev.target.closest(".unpin, .repin");
+    if (pinBtn) {
+      const pinned = pinBtn.classList.contains("repin");
+      pinBtn.disabled = true;
+      try {
+        const data = await (await fetch("api/pin/" + pinBtn.dataset.id, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinned }) })).json();
+        if (!data.ok) throw new Error(data.error);
+        pinBtn.classList.toggle("unpin", pinned); pinBtn.classList.toggle("repin", !pinned);
+        pinBtn.textContent = pinned ? "取消钉住" : "钉回去";
+        const it = ITEMS.get(pinBtn.dataset.id); if (it) it.pinned = pinned;
+      } catch (e) { alert(e.message || "没改成"); }
+      pinBtn.disabled = false;
+      return;
+    }
     const editBtn = ev.target.closest(".edit");
     if (editBtn) {
       const d = editBtn.closest("details"), it = ITEMS.get(editBtn.dataset.id);
@@ -1254,7 +1269,7 @@
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
       ${rateHtml(it)}
-      <div class="close-wrap">${it.kind === "image" && imgs.length === 1 ? `<button type="button" class="edit danger del-img" data-id="${esc(it.id)}">删除</button>` : ""}${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
+      <div class="close-wrap">${it.kind === "image" && imgs.length === 1 ? `<button type="button" class="edit danger del-img" data-id="${esc(it.id)}">删除</button>` : ""}${it.pinned ? `<button type="button" class="edit unpin" data-id="${esc(it.id)}">取消钉住</button>` : ""}${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
   }
 
   async function loadBrowse(first) {
