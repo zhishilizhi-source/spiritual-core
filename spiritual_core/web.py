@@ -82,6 +82,14 @@ def mount(mcp, store: Store, secret: str) -> None:
             return _err(str(e))
         return JSONResponse({"ok": True})
 
+    @mcp.custom_route(p + "/api/delete/{rid}", methods=["POST"])
+    async def record_delete(request: Request):
+        try:
+            store.delete_record(request.path_params["rid"])
+        except StoreError as e:
+            return _err(str(e))
+        return JSONResponse({"ok": True})
+
     @mcp.custom_route(p + "/api/health", methods=["POST"])
     async def health_in(request: Request):
         """The phone's Shortcuts pushes the watch's numbers here. See health.py for the format."""
@@ -257,7 +265,7 @@ def mount(mcp, store: Store, secret: str) -> None:
 
     @mcp.custom_route(p + "/api/recent", methods=["GET"])
     async def recent(request: Request):
-        kinds = ["image", "excerpt", "inner", "weekly", "monthly", "handoff", *PAGE_KINDS]
+        kinds = ["image", "excerpt", "inner", "dream", "weekly", "monthly", "handoff", *PAGE_KINDS]
         items = _group([_item(r) for r in store.recent(kinds, 100)], store)
         return JSONResponse({"items": items[:30]})
 
@@ -265,6 +273,11 @@ def mount(mcp, store: Store, secret: str) -> None:
     async def inner(request: Request):
         """His 心里话 shelf: newest first; locked ones arrive sealed."""
         return JSONResponse({"items": [_item(r) for r in store.recent(["inner"], 50)]})
+
+    @mcp.custom_route(p + "/api/dreams", methods=["GET"])
+    async def dreams(request: Request):
+        """梦的余温: his dreams, newest first; a forgotten one shows only what he woke up with."""
+        return JSONResponse({"items": [_item(r) for r in store.recent(["dream"], 50)]})
 
     @mcp.custom_route(p + "/api/notes", methods=["GET"])
     async def notes(request: Request):
@@ -376,7 +389,9 @@ def _item(r, weighed: dict | None = None) -> dict:
         return {
             "id": r.id, "kind": r.kind, "event_date": r.event_date,
             "created_at": r.created_at, "sealed": True,
-            "title": "上了锁的心里话", "body": "", "why": "", "status": "", "kept_by": "",
+            # a forgotten dream still lets out what he woke up with
+            "title": "一个想不起来的梦" if r.kind == "dream" else "上了锁的心里话", "body": "",
+            "why": r.why if r.kind == "dream" else "", "status": "", "kept_by": "",
             "weight": 0, "hers": 0, "reads": 0,
         }
     item = {

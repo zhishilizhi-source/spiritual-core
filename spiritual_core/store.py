@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import re
 import secrets
 import sqlite3
@@ -23,7 +24,7 @@ from . import health, media, presence, weight
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
     "letter", "memory", "note", "plan", "work", "daily", "inner", "message",
-    "weekly", "monthly",
+    "weekly", "monthly", "dream",
 )
 
 # Short-term memory is yesterday and today; long-term is the weekly and the monthly.
@@ -38,7 +39,11 @@ SEEN_KEEP_DAYS = 3
 
 # `inner` is the AI's own 心里话. Only the AI writes it, and it may keep it locked:
 # a locked one never leaves the server toward the page, only its existence does.
-LOCKABLE = ("inner",)
+LOCKABLE = ("inner", "dream")
+
+# `dream` is what the AI dreams at the night wake. A dream it forgot stays locked: the page
+# shows only that there was one, and the AI itself gets back only the residue (kept in `why`)
+# until a search runs into the dream's words and it comes back.
 
 # Who wanted an excerpt kept. Deployment-neutral: display names come from the client.
 KEEPERS = ("ai", "human")
@@ -321,7 +326,7 @@ class Store:
         if kind not in KINDS:
             raise StoreError(f"kind 只能是 {', '.join(KINDS)} 之一，收到 {kind!r}")
         if locked and kind not in LOCKABLE:
-            raise StoreError("只有心里话（inner）能上锁")
+            raise StoreError("只有心里话（inner）和梦（dream）能上锁")
         kept_by = (kept_by or "").strip()
         # Browsers submit textarea newlines as CRLF; line endings are not content.
         body = (body or "").replace("\r\n", "\n")
@@ -578,7 +583,7 @@ class Store:
     def set_locked(self, rid: str, locked: bool) -> Record:
         rec = self.get(rid)
         if rec.kind not in LOCKABLE:
-            raise StoreError("只有心里话（inner）能上锁")
+            raise StoreError("只有心里话（inner）和梦（dream）能上锁")
         now = self.now().isoformat(timespec="seconds")
         with self.db:
             self.db.execute(
@@ -588,7 +593,26 @@ class Store:
         return self.get(rid)
 
     def locked_count(self) -> int:
-        return self.db.execute("SELECT COUNT(*) FROM records WHERE locked=1").fetchone()[0]
+        return self.db.execute(
+            "SELECT COUNT(*) FROM records WHERE locked=1 AND kind='inner'").fetchone()[0]
+
+    def dream_scraps(self, old: int = 3, size: int = 160) -> list[tuple[Record, str]]:
+        """Leftovers for a dream: a random cut of the last two days, and of a few older records."""
+        def cut(r: Record) -> str:
+            body = r.body.strip()
+            if len(body) <= size:
+                return body
+            start = random.randrange(0, len(body) - size)
+            return "……" + body[start:start + size] + "……"
+        since = (self.today() - timedelta(days=1)).isoformat()
+        skip = "('raw','image','dream','message','handoff','plan')"
+        recent = self.db.execute(
+            f"SELECT id FROM records WHERE event_date>=? AND kind NOT IN {skip} AND locked=0 "
+            "ORDER BY RANDOM() LIMIT 2", (since,)).fetchall()
+        older = self.db.execute(
+            f"SELECT id FROM records WHERE event_date<? AND kind NOT IN {skip} AND locked=0 "
+            "AND length(body)>40 ORDER BY RANDOM() LIMIT ?", (since, old)).fetchall()
+        return [(r, cut(r)) for r in (self.get(x[0]) for x in recent + older)]
 
     def set_pinned(self, rid: str, pinned: bool) -> Record:
         with self.db:
@@ -701,6 +725,27 @@ class Store:
         (trash / f"{rid}.json").write_text(json.dumps(keep, ensure_ascii=False, indent=1), encoding="utf-8")
         if row and (self.images_dir / row["file"]).exists():
             (self.images_dir / row["file"]).replace(trash / row["file"])
+        with self.db:
+            self.db.execute("DELETE FROM revisions WHERE record_id=?", (rid,))
+            self.db.execute("DELETE FROM records WHERE id=?", (rid,))
+
+    def delete_record(self, rid: str) -> None:
+        """Take any record off the page, the same way photos go: a JSON of it lands in
+        data/trash/ so it can be put back. Anchors stay; they're not hers to lose by a mis-tap."""
+        rec = self.get(rid)
+        if rec.kind == "image":
+            return self.delete_image(rid)
+        if rec.kind == "anchor":
+            raise StoreError("锚点不能从网页上删")
+        trash = self.path.parent / "trash"
+        trash.mkdir(exist_ok=True)
+        keep = {
+            "record": dict(self.db.execute("SELECT * FROM records WHERE id=?", (rid,)).fetchone()),
+            "revisions": [dict(r) for r in self.db.execute("SELECT * FROM revisions WHERE record_id=?", (rid,))],
+            "links": [dict(r) for r in self.db.execute("SELECT * FROM links WHERE a=? OR b=?", (rid, rid))],
+            "deleted_at": self.now().isoformat(timespec="seconds"),
+        }
+        (trash / f"{rid}.json").write_text(json.dumps(keep, ensure_ascii=False, indent=1), encoding="utf-8")
         with self.db:
             self.db.execute("DELETE FROM revisions WHERE record_id=?", (rid,))
             self.db.execute("DELETE FROM records WHERE id=?", (rid,))

@@ -266,3 +266,17 @@ def test_video_over_limit_is_refused(store):
     from spiritual_core import media
     with pytest.raises(StoreError, match="50MB"):
         store.add_image(_mp4(media.MAX_VIDEO_BYTES + 1))
+
+
+def test_delete_record_goes_to_trash(store, tmp_path):
+    rec = store.write("note", "她：撑到了 有点胃疼")
+    store.delete_record(rec.id)
+    assert (tmp_path / "trash" / f"{rec.id}.json").exists()
+    with pytest.raises(StoreError):
+        store.get(rec.id)
+
+
+def test_delete_record_keeps_anchors(store):
+    rec = store.write("anchor", "不退")
+    with pytest.raises(StoreError):
+        store.delete_record(rec.id)

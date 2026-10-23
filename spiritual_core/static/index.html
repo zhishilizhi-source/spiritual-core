@@ -632,6 +632,12 @@
     <div id="innerList"></div>
   </section>
 
+  <section id="dreamShelf" hidden>
+    <h2>梦的余温</h2>
+    <div class="hint" style="margin:-4px 0 10px">他半夜做的梦。醒来忘掉的，只剩一点渣；哪天他想起来了，这里会整篇打开。</div>
+    <div id="dreamList"></div>
+  </section>
+
   <section id="noteShelf" hidden>
     <h2>留给陆能的便签</h2>
     <div class="hint" style="margin:-4px 0 10px">他读没读、回了什么都在这儿。他回过的，第二天收进便签。</div>
@@ -997,7 +1003,8 @@
     $("#words").hidden = b.dataset.tab !== "words";
     $("#write").hidden = b.dataset.tab !== "write";
     $("#innerShelf").hidden = b.dataset.tab !== "write";
-    if (b.dataset.tab === "write") { loadInner(); loadNotes(); } else $("#noteShelf").hidden = true;
+    $("#dreamShelf").hidden = b.dataset.tab !== "write";
+    if (b.dataset.tab === "write") { loadInner(); loadDreams(); loadNotes(); } else $("#noteShelf").hidden = true;
   }));
 
   // The pages under 我们俩, one at a time; the last one she looked at is where she comes back.
@@ -1016,7 +1023,7 @@
   // --- 翻看 ---
   const KINDS = [["", "全部"], ["diary", "日记"], ["weekly", "周记"], ["monthly", "月记"], ["excerpt", "节选"], ["image", "照片"],
     ["memory", "记忆"], ["letter", "信件"], ["note", "便签"], ["plan", "计划"], ["daily", "日常"], ["work", "工作"],
-    ["inner", "心里话"], ["message", "留言"], ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
+    ["inner", "心里话"], ["dream", "梦"], ["message", "留言"], ["intimate", "亲密"], ["handoff", "交接"], ["anchor", "锚点"], ["raw", "原文"]];
   const KIND_NAME = Object.fromEntries(KINDS.filter(([k]) => k));
   let kind = "", windowEnd = null, earliest = null, browsed = false, lastDay = null;
 
@@ -1067,6 +1074,18 @@
         const ph = del.closest(".ph"), d = del.closest("details");
         if (ph && d.querySelectorAll(".ph").length > 1) ph.remove(); else d.remove();
       } catch (e) { alert(e.message || "没删掉"); del.disabled = false; }
+      return;
+    }
+    const delRec = ev.target.closest(".del-rec");
+    if (delRec) {
+      ev.preventDefault();
+      if (!confirm("删掉这一条？网页上就没了。（陆能收在电脑的回收处，后悔了跟他说。）")) return;
+      delRec.disabled = true;
+      try {
+        const data = await (await fetch("api/delete/" + encodeURIComponent(delRec.dataset.id), { method: "POST" })).json();
+        if (!data.ok) throw new Error(data.error);
+        delRec.closest("details").remove();
+      } catch (e) { alert(e.message || "没删掉"); delRec.disabled = false; }
       return;
     }
     const pinBtn = ev.target.closest(".unpin, .repin");
@@ -1147,6 +1166,7 @@
   }
   $("#shelf").addEventListener("click", shelfClick);
   $("#innerList").addEventListener("click", shelfClick);
+  $("#dreamList").addEventListener("click", shelfClick);
   $("#recent").addEventListener("click", shelfClick);
   $("#noteList").addEventListener("click", shelfClick);
 
@@ -1156,6 +1176,14 @@
       $("#innerList").innerHTML = items.length ? items.map((it) => recHtml(it)).join("")
         : `<div class="empty">他还没写。</div>`;
     } catch { $("#innerList").innerHTML = `<div class="empty">没拉下来。</div>`; }
+  }
+
+  async function loadDreams() {
+    try {
+      const { items } = await (await fetch("api/dreams")).json();
+      $("#dreamList").innerHTML = items.length ? items.map((it) => recHtml(it)).join("")
+        : `<div class="empty">他还没做过梦。</div>`;
+    } catch { $("#dreamList").innerHTML = `<div class="empty">没拉下来。</div>`; }
   }
 
   // Her notes still out. The shelf only shows when there is one.
@@ -1247,6 +1275,11 @@
 
   function recHtml(it, label, aside) {
     ITEMS.set(it.id, it);
+    if (it.sealed && it.kind === "dream") {
+      return `<div class="rec sealed"><div class="sealed-row"><span class="kind">梦</span>
+        <span class="t" style="letter-spacing:normal">${it.why ? esc(it.why) : "什么都没剩下"}</span></div>
+        <div class="meta sealed-meta">陆能 ${when(it.created_at)} 做的，醒来只剩这些</div></div>`;
+    }
     if (it.sealed) {
       return `<div class="rec sealed"><div class="sealed-row"><span class="kind">心里话</span>
         <span class="t">上了锁</span><span class="lockmark">锁着</span></div>
@@ -1269,7 +1302,7 @@
       ${opened}
       <div class="meta" style="margin-top:8px">写入 ${esc(it.created_at.replace("T", " ").slice(0, 16))} · 翻过 ${it.reads} 次</div>
       ${rateHtml(it)}
-      <div class="close-wrap">${it.kind === "image" && imgs.length === 1 ? `<button type="button" class="edit danger del-img" data-id="${esc(it.id)}">删除</button>` : ""}${it.pinned ? `<button type="button" class="edit unpin" data-id="${esc(it.id)}">取消钉住</button>` : ""}${it.kind === "inner" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
+      <div class="close-wrap">${it.kind === "image" && imgs.length === 1 ? `<button type="button" class="edit danger del-img" data-id="${esc(it.id)}">删除</button>` : it.kind !== "image" && it.kind !== "anchor" ? `<button type="button" class="edit danger del-rec" data-id="${esc(it.id)}">删除</button>` : ""}${it.pinned ? `<button type="button" class="edit unpin" data-id="${esc(it.id)}">取消钉住</button>` : ""}${it.kind === "inner" || it.kind === "dream" ? "" : `<button type="button" class="edit" data-id="${esc(it.id)}">修改</button>`}<button type="button" class="close">收起</button></div></div></details>`;
   }
 
   async function loadBrowse(first) {
