@@ -174,7 +174,7 @@ def test_read_but_unanswered_messages_leave_the_board_after_three_days(env, monk
     monkeypatch.setattr(store, "now", lambda: real_now + timedelta(days=3))
     assert {x["id"] for x in client.get("/k/api/today").json()["messages"]} == {unread.id}
     rec = store.get(seen.id)
-    assert rec.kind == "note" and rec.body.startswith("她看过没回的") and "多多读过" in rec.body
+    assert rec.kind == "note" and rec.body.startswith("她看过没回的") and "她读过" in rec.body
     assert seen.id not in {x.id for x in store.answered()}
     assert store.recycle_messages() == 0                              # filed once, not again
 

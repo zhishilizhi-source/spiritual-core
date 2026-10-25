@@ -553,7 +553,7 @@
 </head>
 <body>
   <canvas id="cosmos" aria-hidden="true"></canvas>
-  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能和多多的记忆库</small></span>
+  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>我们的记忆库</small></span>
     <span class="theme" role="group" aria-label="深浅">
       <button type="button" data-theme="plain">极简</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
     </span></h1>
@@ -1554,11 +1554,11 @@
   function renderUs(v) {
     const n = v.her.night;
     const her = n
-      ? `<div class="who">多多<span>昨晚</span></div>${bandHtml(n.segments)}
+      ? `<div class="who">她<span>昨晚</span></div>${bandHtml(n.segments)}
          <div class="big">${hm(n.fell)} → ${hm(n.woke)}</div>
          <div class="small">睡了 ${dur(n.asleep)}${n.wakes ? ` · 醒过 ${n.wakes} 次` : ""}</div>
          <div class="small">深睡 ${dur(n.deep)} · 做梦 ${dur(n.rem)}</div>${heartHtml(v.her.heart)}`
-      : `<div class="who">多多<span>昨晚</span></div><div class="none">昨晚的觉还没推过来。</div>${heartHtml(v.her.heart)}`;
+      : `<div class="who">她<span>昨晚</span></div><div class="none">昨晚的觉还没推过来。</div>${heartHtml(v.her.heart)}`;
     const m = v.me, last = m.wakes[m.wakes.length - 1];
     const myMood = m.now && m.now.mood && MOOD[m.now.mood] ? m.now.mood : "";
     const mc = myMood ? `--m:${moodDot(myMood)}` : "";

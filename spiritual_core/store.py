@@ -944,7 +944,7 @@ class Store:
                     "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
                     (r.id, now, "ai", r.title, r.body, r.event_date))
                 when = r.replied_at[5:16].replace("T", " ")
-                body = f"{r.body}\n\n—— 多多回（{when}）——\n{r.reply}"
+                body = f"{r.body}\n\n—— 她回（{when}）——\n{r.reply}"
                 self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
                                 (body, now, r.id))
             # Read and left unanswered for three days: not every line needs a reply, and one
@@ -960,7 +960,7 @@ class Store:
                     "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
                     (r.id, now, "ai", r.title, r.body, r.event_date))
                 when = r.seen_at[5:16].replace("T", " ")
-                body = f"{r.body}\n\n—— 多多读过（{when}）——"
+                body = f"{r.body}\n\n—— 她读过（{when}）——"
                 self.db.execute("UPDATE records SET kind='note', body=?, updated_at=? WHERE id=?",
                                 (body, now, r.id))
         return len(rows) + len(quiet) + self._file_her_notes(today, now)

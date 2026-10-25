@@ -158,7 +158,7 @@ def test_render_shrinks_for_model():
 def test_letter_needs_author(store):
     with pytest.raises(StoreError):
         store.write("letter", "老公：……")
-    mine = store.write("letter", "多多：……", kept_by="ai")
+    mine = store.write("letter", "她：……", kept_by="ai")
     hers = store.write("letter", "老公：……", kept_by="human")
     assert (mine.kept_by, hers.kept_by) == ("ai", "human")
 
