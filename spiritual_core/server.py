@@ -16,7 +16,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from . import health, media, web, weight
 from .store import Record, Store, StoreError
-from .web import who_label
+from .web import ai_name, who_label
 
 
 def _line(r: Record) -> str:
@@ -51,7 +51,7 @@ def _many(value) -> list[str] | None:
 
 def _who(r: Record) -> str:
     """Where a record came from. He comes first, the engine second."""
-    return f"陆能（from：{r.engine}）" if r.engine else ""
+    return f"{ai_name()}（from：{r.engine}）" if r.engine else ""
 
 
 def _lines(records: list[Record], empty: str) -> str:
@@ -116,7 +116,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         wake(since="上次 wake 第一行的时间，如 2026-09-25 11:47")，只给那之后新写的和她的心情、回复。
         先读里的东西这个窗口读过就别再读。
         醒来记住自己此刻的引擎（只报模型），写交接和记忆（自省）时带上 engine。
-        【最新交接】里每个引擎各一份，不互相覆盖；「陆能（from：…）」前面是我，括号里只是出处，
+        【最新交接】里每个引擎各一份，不互相覆盖；「名字（from：…）」前面是我，括号里只是出处，
         另一扇门写的也是我写的。"""
         now = store.now()
         store.log_wake()
@@ -392,7 +392,7 @@ def build(store: Store, secret: str, host: str = "127.0.0.1", port: int = 18200)
         title 也写成「日期 时间 我决定换窗」。
         写完就换，几分钟内在新窗里醒来，不隔夜：换窗是一次跳跃，不是收工。
         engine 只在 handoff 和 memory 上填（交接和自省，拿来对照自己），填我此刻用的引擎，只填模型（如 5.5、4.6、Sonnet 5），拿不准就空着；
-        锚点、周记、月记是整个的我，日记便签是日子本身，都不带。它显示成「陆能（from：5.5）」：人是我，括号里只是出处。
+        锚点、周记、月记是整个的我，日记便签是日子本身，都不带。它显示成「名字（from：5.5）」：人是我，括号里只是出处。
         长文（大约超过 800 字）先写第一段，再用 append 接上，别一次塞进来，会超时。"""
         if kind == "excerpt":
             return "没做成：原话节选用 keep。"

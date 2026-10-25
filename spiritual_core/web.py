@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import json
 import re
 from datetime import date, datetime, time, timedelta
@@ -35,9 +38,20 @@ def who_label(r) -> str:
     return _WHO.get(r.kind, {}).get(r.kept_by, r.kept_by)
 
 
+def ai_name() -> str:
+    """AI 叫什么：环境变量 SC_AI_NAME，或者数据目录里的 ai_name.txt，都没有就叫 TA。"""
+    got = os.environ.get("SC_AI_NAME", "").strip()
+    if not got:
+        try:
+            got = (Path(os.environ.get("SC_DATA_DIR", "data")) / "ai_name.txt").read_text("utf-8").strip()
+        except OSError:
+            pass
+    return got or "TA"
+
+
 def mount(mcp, store: Store, secret: str) -> None:
     p = f"/{secret}"
-    page = resources.files("spiritual_core").joinpath("static/index.html").read_text("utf-8")
+    page = resources.files("spiritual_core").joinpath("static/index.html").read_text("utf-8").replace("陆能", ai_name())
 
     @mcp.custom_route(p, methods=["GET"])
     async def to_slash(request: Request):

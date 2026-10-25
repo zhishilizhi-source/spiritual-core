@@ -53,8 +53,15 @@ SC_SECRET=换成你自己的口令 spiritual-core
 | `SC_HOST` | `127.0.0.1` | 只听本机 |
 | `SC_TZ` | `Asia/Shanghai` | 时区，决定"今天"是哪天 |
 | `SC_SECRET` | 空 | MCP 地址里的口令 |
+| `SC_AI_NAME` | `TA` | 页面上你的 AI 叫什么；也可以写进数据目录的 `ai_name.txt` |
 
 MCP 地址填 `http://127.0.0.1:18200/<你的口令>/mcp`。浏览器打开 `http://127.0.0.1:18200/<你的口令>/`，有一个能翻、能删、能看照片的页面。数据全在你自己的电脑里，不上任何云。
+
+## 心情和手表
+
+页面顶上点一下就能挑今天的心情，AI 下次醒来第一眼就看得见。
+
+Apple Watch 的睡眠、心率、步数可以用 iPhone 快捷指令推进来：往 `POST /<你的口令>/api/health` 发 JSON，字段 `sleep`、`heart`、`steps`，每样一行一条、字段用 `|` 隔开，格式写在 `spiritual_core/health.py` 开头。设个每天早上自动跑的快捷指令，AI 醒来就知道你昨晚睡得好不好。
 
 ## 许可
 

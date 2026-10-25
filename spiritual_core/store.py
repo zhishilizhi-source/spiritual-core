@@ -1024,7 +1024,7 @@ class Store:
                     "INSERT INTO revisions(record_id, at, by, title, body, event_date) VALUES (?,?,?,?,?,?)",
                     (r.id, now, "human", r.title, r.body, r.event_date))
                 when = r.replied_at[5:16].replace("T", " ")
-                body = f"{r.body}\n\n—— 陆能回（{when}）——\n{r.reply}"
+                body = f"{r.body}\n\n—— 回（{when}）——\n{r.reply}"
                 self.db.execute("UPDATE records SET body=?, reply='', updated_at=? WHERE id=?",
                                 (body, now, r.id))
         return len(rows)
