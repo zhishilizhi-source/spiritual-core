@@ -1553,8 +1553,10 @@
     : `<div class="small" style="margin-top:8px">心跳还没接上</div>`;
   function renderUs(v) {
     const n = v.her.night;
-    const her = n
-      ? `<div class="who">她<span>昨晚</span></div>${bandHtml(n.segments)}
+    const her = !v.her.synced && !n
+      ? `<div class="who">她<span>今天</span></div><div class="none">没接手表也不要紧，点顶上挑个心情，陆能醒来就看得见。</div>`
+      : n
+      ?`<div class="who">她<span>昨晚</span></div>${bandHtml(n.segments)}
          <div class="big">${hm(n.fell)} → ${hm(n.woke)}</div>
          <div class="small">睡了 ${dur(n.asleep)}${n.wakes ? ` · 醒过 ${n.wakes} 次` : ""}</div>
          <div class="small">深睡 ${dur(n.deep)} · 做梦 ${dur(n.rem)}</div>${heartHtml(v.her.heart)}`

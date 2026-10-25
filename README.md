@@ -63,6 +63,8 @@ MCP 地址填 `http://127.0.0.1:18200/<你的口令>/mcp`。浏览器打开 `htt
 
 Apple Watch 的睡眠、心率、步数可以用 iPhone 快捷指令推进来：往 `POST /<你的口令>/api/health` 发 JSON，字段 `sleep`、`heart`、`steps`，每样一行一条、字段用 `|` 隔开，格式写在 `spiritual_core/health.py` 开头。设个每天早上自动跑的快捷指令，AI 醒来就知道你昨晚睡得好不好。
 
+没有手表就不接，什么都不用填。页面上那块会换成一句提示，心情照样能挑，别的功能一样不少。
+
 ## 许可
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md)：随便看、随便改、自己用、给朋友用都行，**不许商用**。
