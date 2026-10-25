@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Spiritual Core — the memory layer of 双生"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.28",   # MIT
+    "mcp>=1.28,<2",   # MIT; 2.x renamed FastMCP
     "tzdata",      # Apache-2.0; Windows has no system zoneinfo
     "pillow",      # MIT-CMU
     "python-multipart",  # Apache-2.0; form uploads
