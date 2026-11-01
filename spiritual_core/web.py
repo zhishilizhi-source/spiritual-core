@@ -14,7 +14,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from . import health, media, weight
-from .store import MOODS, Store, StoreError, _months_back
+from .store import MOODS, Record, Store, StoreError, _months_back
 
 _WHO = {
     "excerpt": {"ai": "我想留的", "human": "她想留的"},
@@ -282,6 +282,26 @@ def mount(mcp, store: Store, secret: str) -> None:
         kinds = ["image", "excerpt", "inner", "dream", "weekly", "monthly", "handoff", *PAGE_KINDS]
         items = _group([_item(r) for r in store.recent(kinds, 100)], store)
         return JSONResponse({"items": items[:30]})
+
+    @mcp.custom_route(p + "/api/rings", methods=["GET"])
+    async def rings(request: Request):
+        """年轮: one ring a day, from the first day the library got busy; older ones are the seed."""
+        today = store.today()
+        year_ago = (today - timedelta(days=365)).isoformat()
+        busy = store.db.execute(
+            "SELECT event_date FROM records WHERE event_date >= ? GROUP BY event_date"
+            " HAVING COUNT(*) >= 3 ORDER BY event_date LIMIT 1", (year_ago,)).fetchone()
+        start = busy[0] if busy else today.isoformat()
+        seed = store.db.execute("SELECT COUNT(*) FROM records WHERE event_date < ?", (start,)).fetchone()[0]
+        rows = store.db.execute(
+            "SELECT * FROM records WHERE event_date BETWEEN ? AND ? ORDER BY event_date, created_at",
+            (start, today.isoformat())).fetchall()
+        dots = []
+        for row in rows:
+            it = _item(Record.from_row(row))
+            dots.append({k: it.get(k) for k in ("id", "kind", "event_date", "created_at", "title", "pinned", "sealed")}
+                        | {"body": (it.get("body") or "")[:140], "weight": it.get("weight") or 0})
+        return JSONResponse({"start": start, "end": today.isoformat(), "seed": seed, "dots": dots})
 
     @mcp.custom_route(p + "/api/inner", methods=["GET"])
     async def inner(request: Request):

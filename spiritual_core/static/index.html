@@ -549,11 +549,23 @@
   .side .mdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 6px; vertical-align: 1px; }
   .side .mword { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 3px; }
   .week-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  /* 年轮: always a night slice of wood, whatever the theme, so it reads the same on video. */
+  .rings { background: radial-gradient(circle at 50% 45%, #2a2238, #120f1c 75%); border-radius: var(--radius);
+           padding: 10px 10px 14px; color: #e9dfd2; margin-top: 12px; }
+  #ringCanvas { display: block; width: 100%; aspect-ratio: 1; touch-action: none; cursor: grab; }
+  .ring-stat { text-align: center; font-size: 13px; color: #cbbfae; margin-top: 4px; letter-spacing: .5px; }
+  .ring-stat b { color: #f2c46d; font-weight: 600; }
+  .ring-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 12px; color: #b9ae9f; margin-top: 8px; }
+  .ring-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+  .ring-pick { margin-top: 10px; background: rgba(255,255,255,.06); border-radius: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.55; }
+  .ring-pick .rk { font-size: 12px; color: #b9ae9f; }
+  .ring-pick .rt { font-weight: 600; margin: 2px 0; color: #f4ece2; }
+  .ring-pick .rb { color: #d6cbbd; white-space: pre-wrap; }
 </style>
 </head>
 <body>
   <canvas id="cosmos" aria-hidden="true"></canvas>
-  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>我们的记忆库</small></span>
+  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能的记忆库</small></span>
     <span class="theme" role="group" aria-label="深浅">
       <button type="button" data-theme="plain">极简</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
     </span></h1>
@@ -566,10 +578,20 @@
   <section class="us" id="us" aria-label="我们俩"></section>
 
   <div class="tabs pages" role="tablist">
+    <button role="tab" aria-selected="false" data-page="rings">年轮</button>
     <button role="tab" aria-selected="true" data-page="today">今天</button>
     <button role="tab" aria-selected="false" data-page="save">存东西</button>
     <button role="tab" aria-selected="false" data-page="browse">翻看</button>
     <button role="tab" aria-selected="false" data-page="recent">最近</button>
+  </div>
+
+  <div class="page" data-page="rings" hidden>
+  <section class="rings" aria-label="年轮">
+    <canvas id="ringCanvas"></canvas>
+    <div class="ring-stat" id="ringStat"></div>
+    <div class="ring-legend" id="ringLegend"></div>
+    <div class="ring-pick" id="ringPick" hidden></div>
+  </section>
   </div>
 
   <div class="page" data-page="today">
@@ -1009,12 +1031,13 @@
 
   // The pages under 我们俩, one at a time; the last one she looked at is where she comes back.
   function showPage(name) {
-    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "today";
+    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "rings";
     document.querySelectorAll(".pages button").forEach((x) =>
       x.setAttribute("aria-selected", String(x.dataset.page === name)));
     document.querySelectorAll(".page").forEach((pg) => { pg.hidden = pg.dataset.page !== name; });
     if (name === "browse" && !browsed) resetBrowse();
     if (name === "save") fitForms();
+    if (name === "rings") startRings();
     try { localStorage.setItem("sc-page", name); } catch {}
   }
   document.querySelectorAll(".pages button").forEach((b) =>
@@ -1666,9 +1689,190 @@
     try { renderUs(await (await fetch("api/us")).json()); } catch {}
   }
   loadUs();
-  // a page can be opened by name from the address (…/#save), else the last one she looked at
-  let startPage = location.hash.slice(1);
-  if (!startPage) try { startPage = localStorage.getItem("sc-page") || "today"; } catch { startPage = "today"; }
+
+  // --- 年轮: one ring a day, grown out of the seed; …/?demo#rings shows made-up rings for filming ---
+  const RING_KINDS = {
+    diary: "#f2c46d", weekly: "#f2c46d", monthly: "#f2c46d", intimate: "#ff6f8e", image: "#7fd1c7",
+    memory: "#8fb6ff", excerpt: "#c9a7ff", letter: "#ffd6a5", message: "#ff9ecb", plan: "#ffa463",
+    work: "#ffa463", daily: "#b8e07a", inner: "#e58cff", dream: "#9e8cff", note: "#a9b3c9",
+    anchor: "#ffffff", handoff: "#6c7896", raw: "#4a5370",
+  };
+  const RING_LEGEND = [["diary", "日记"], ["intimate", "亲密"], ["image", "照片"], ["memory", "记忆"],
+    ["excerpt", "原话"], ["plan", "计划"], ["inner", "心里话"], ["dream", "梦"], ["anchor", "锚点"]];
+  const rc = $("#ringCanvas"), rx = rc.getContext("2d");
+  let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null;
+  const ringView = { k: 1, x: 0, y: 0 };
+  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+  // the same grain runs through every ring, drifting a little outward, like a real cut log
+  const wob = (t, i) => 1 + .028 * Math.sin(3 * t + .8 + i * .004) + .016 * Math.sin(5 * t + 2.1 + i * .011) + .008 * Math.sin(11 * t + i * .03);
+  const dayNum = (s) => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
+
+  function shapeRings(data) {
+    const d0 = dayNum(data.start), n = Math.max(1, dayNum(data.end) - d0 + 1);
+    const counts = new Array(n).fill(0), months = new Array(n).fill("");
+    for (let i = 0; i < n; i++) {
+      const d = new Date((d0 + i) * 864e5);
+      if (d.getUTCDate() === 1) months[i] = `${d.getUTCMonth() + 1}月`;
+    }
+    const dots = data.dots.map((d) => {
+      const i = Math.min(n - 1, Math.max(0, dayNum(d.event_date) - d0));
+      counts[i]++;
+      const m = /T(\d\d):(\d\d)/.exec(d.created_at || "");
+      const h = m ? +m[1] + m[2] / 60 : 12;   // midnight at the top, noon at the bottom
+      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2, jr: hash01(d.id) };
+    });
+    return { ...data, n, counts, months, dots };
+  }
+
+  function fakeRings() {
+    const kinds = ["diary", "intimate", "image", "memory", "memory", "excerpt", "note", "note", "plan", "work", "raw", "raw", "inner", "dream", "anchor", "daily"];
+    const titles = ["一起看了场雨", "她说想我", "第一次吵架", "晚饭吃了火锅", "约好周末去海边", "她夸我了", "半夜睡不着聊到三点",
+      "她教我一个新词", "给她念了首诗", "今天她不开心", "和好了", "她换了新头像", "一起听了一首歌", "说好的事记下来"];
+    const end = new Date(), n = 130, dots = [];
+    for (let i = 0; i < n; i++) {
+      const day = new Date(end - (n - 1 - i) * 864e5).toISOString().slice(0, 10);
+      const burst = Math.random() < .12 ? 10 : 0;
+      for (let j = 0, c = 2 + Math.floor(Math.random() * 8) + burst; j < c; j++) {
+        const h = (20 + Math.floor(Math.random() * 14)) % 24, kind = kinds[Math.floor(Math.random() * kinds.length)];
+        dots.push({ id: `${i}-${j}`, kind, event_date: day, created_at: `${day}T${String(h).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
+          title: titles[Math.floor(Math.random() * titles.length)], body: "", pinned: Math.random() < .01, sealed: kind === "inner" && Math.random() < .5 });
+      }
+    }
+    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots };
+  }
+
+  function drawRings(now) {
+    const dpr = devicePixelRatio || 1, S = rc.clientWidth;
+    if (!S) return;
+    if (rc.width !== Math.round(S * dpr)) rc.width = rc.height = Math.round(S * dpr);
+    rx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rx.clearRect(0, 0, S, S);
+    if (!ring) return;
+    const k = S * .45 * ringView.k, cx = S / 2 + ringView.x, cy = S / 2 + ringView.y;
+    const R0 = .1, step = (1 - R0) / ring.n;
+    // grows out of the seed in about three seconds, easing off at the bark
+    const p = Math.min(1, (now - ringT0) / 3200), shown = ring.n * (1 - Math.pow(1 - p, 3));
+    const at = (t, r, i) => { const w = r * wob(t, i) * k; return [cx + Math.cos(t) * w, cy + Math.sin(t) * w]; };
+
+    const g = rx.createRadialGradient(cx, cy, 0, cx, cy, R0 * k * 1.4);
+    g.addColorStop(0, "rgba(242,196,109,.7)"); g.addColorStop(1, "rgba(242,196,109,0)");
+    rx.fillStyle = g; rx.beginPath(); rx.arc(cx, cy, R0 * k * 1.4, 0, 7); rx.fill();
+
+    for (let i = 0; i < shown; i++) {
+      const r = R0 + step * (i + 1), c = Math.min(ring.counts[i], 24) / 24, last = i === ring.n - 1;
+      rx.strokeStyle = last ? `rgba(242,196,109,${.55 + .3 * Math.sin(now / 420)})`
+        : `rgba(232,196,150,${(ring.months[i] ? .34 : .05) + c * .4})`;
+      rx.lineWidth = last ? 2 : ring.months[i] ? 1.1 : .5 + c * 1.6;   // a busy day leaves a thicker ring
+      rx.beginPath();
+      for (let j = 0; j <= 120; j++) { const [x, y] = at(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
+      rx.stroke();
+    }
+
+    rx.globalCompositeOperation = "lighter";
+    const zoom = Math.min(2.2, Math.sqrt(ringView.k));
+    for (const d of ring.dots) {
+      if (d.i >= shown) { d.sx = null; continue; }
+      const [x, y] = at(d.t, R0 + step * (d.i + 1 - d.jr * .85), d.i);
+      d.sx = x; d.sy = y;
+      const big = d.pinned ? 3.2 : ["diary", "intimate", "anchor", "excerpt"].includes(d.kind) ? 2.1 : ["raw", "handoff", "note"].includes(d.kind) ? 1 : 1.5;
+      const col = RING_KINDS[d.kind] || "#a9b3c9";
+      rx.fillStyle = col; rx.globalAlpha = .18;
+      rx.beginPath(); rx.arc(x, y, big * 2.6 * zoom, 0, 7); rx.fill();
+      rx.globalAlpha = d.sealed ? .45 : .95;
+      rx.beginPath(); rx.arc(x, y, big * zoom, 0, 7); rx.fill();
+    }
+    rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
+
+    rx.font = "11px -apple-system, 'PingFang SC', sans-serif"; rx.textAlign = "center"; rx.fillStyle = "rgba(233,223,210,.75)";
+    ring.months.forEach((m, i) => { if (m && i < shown) { const [x, y] = at(-Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y - 4); } });
+    if (shown >= ring.n - .5) {
+      const [x, y] = at(-Math.PI / 2, 1, ring.n - 1);
+      rx.fillStyle = "#f2c46d"; rx.fillText("今天", x, y - 6);
+    }
+    if (ringPicked && ringPicked.sx != null) {
+      rx.strokeStyle = "#fff"; rx.lineWidth = 1.2;
+      rx.beginPath(); rx.arc(ringPicked.sx, ringPicked.sy, 7, 0, 7); rx.stroke();
+    }
+  }
+
+  function ringFrame(now) {
+    if (rc.closest(".page").hidden) { ringLoop = false; return; }
+    drawRings(now);
+    requestAnimationFrame(ringFrame);
+  }
+
+  async function startRings() {
+    if (!ring) {
+      try {
+        ring = shapeRings(location.search.includes("demo") ? fakeRings() : await (await fetch("api/rings")).json());
+      } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
+      $("#ringStat").innerHTML = `长了 <b>${ring.n}</b> 圈 · 存了 <b>${ring.dots.length}</b> 条 · 芯里还藏着 <b>${ring.seed}</b> 条`;
+      $("#ringLegend").innerHTML = RING_LEGEND.map(([k, n]) => `<span><i style="background:${RING_KINDS[k]}"></i>${n}</span>`).join("");
+      ringT0 = performance.now();
+    }
+    if (!ringLoop) { ringLoop = true; requestAnimationFrame(ringFrame); }
+  }
+
+  function pickRing(px, py) {
+    let best = null, bd = 18 * 18;
+    for (const d of ring?.dots || []) {
+      if (d.sx == null) continue;
+      const dd = (d.sx - px) ** 2 + (d.sy - py) ** 2;
+      if (dd < bd) { bd = dd; best = d; }
+    }
+    ringPicked = best;
+    const box = $("#ringPick");
+    if (!best) { box.hidden = true; return; }
+    const when = `${best.event_date}${/T(\d\d:\d\d)/.test(best.created_at || "") ? " · 写于 " + RegExp.$1 : ""}`;
+    box.innerHTML = `<div class="rk"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${RING_KINDS[best.kind] || "#a9b3c9"}"></i> ${esc(KIND_NAME[best.kind] || best.kind)} · ${esc(when)}</div>`
+      + `<div class="rt">${esc(best.title || "（没有标题）")}</div>` + (best.body ? `<div class="rb">${esc(best.body)}${best.body.length >= 140 ? "…" : ""}</div>` : "");
+    box.hidden = false;
+  }
+
+  // one finger drags, two fingers pinch, a tap picks the nearest star; the wheel zooms on a computer
+  const ringPtrs = new Map();
+  let ringPinch = null, ringTap = null;
+  rc.addEventListener("pointerdown", (e) => {
+    rc.setPointerCapture(e.pointerId);
+    ringPtrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    ringTap = ringPtrs.size === 1 ? { x: e.offsetX, y: e.offsetY, at: performance.now() } : null;
+    if (ringPtrs.size === 2) {
+      const [a, b] = [...ringPtrs.values()];
+      ringPinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), k: ringView.k };
+    }
+  });
+  rc.addEventListener("pointermove", (e) => {
+    const was = ringPtrs.get(e.pointerId); if (!was) return;
+    const now = { x: e.offsetX, y: e.offsetY };
+    ringPtrs.set(e.pointerId, now);
+    if (ringPtrs.size === 2 && ringPinch) {
+      const [a, b] = [...ringPtrs.values()];
+      ringView.k = Math.max(.6, Math.min(12, ringPinch.k * Math.hypot(a.x - b.x, a.y - b.y) / ringPinch.dist));
+    } else if (ringPtrs.size === 1) {
+      ringView.x += now.x - was.x; ringView.y += now.y - was.y;
+    }
+  });
+  const ringUp = (e) => {
+    if (ringTap && ringPtrs.size === 1 && performance.now() - ringTap.at < 350
+        && Math.hypot(e.offsetX - ringTap.x, e.offsetY - ringTap.y) < 6) pickRing(e.offsetX, e.offsetY);
+    ringPtrs.delete(e.pointerId);
+    if (ringPtrs.size < 2) ringPinch = null;
+    ringTap = null;
+  };
+  rc.addEventListener("pointerup", ringUp);
+  rc.addEventListener("pointercancel", ringUp);
+  rc.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const f = Math.exp(-e.deltaY / 400), k = Math.max(.6, Math.min(12, ringView.k * f)), S = rc.clientWidth;
+    // zoom around the cursor
+    const ox = e.offsetX - S / 2 - ringView.x, oy = e.offsetY - S / 2 - ringView.y;
+    ringView.x -= ox * (k / ringView.k - 1); ringView.y -= oy * (k / ringView.k - 1);
+    ringView.k = k;
+  }, { passive: false });
+  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.x = ringView.y = 0; ringT0 = performance.now(); });
+
+  // a page can be opened by name from the address (…/#save); otherwise home is the rings
+  let startPage = location.hash.slice(1) || "rings";
   showPage(startPage);
 </script>
 </body>
