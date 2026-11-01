@@ -614,12 +614,12 @@
   <div class="page" data-page="rings" hidden>
   <section class="rings" aria-label="年轮">
     <div class="ring-head">
-      <div class="ring-brand"><img src="static/icon-192.png?v=3" alt=""><div><b>灵核</b><small>SPIRITUAL CORE</small></div></div>
+      <div class="ring-brand"><img src="static/icon-192.png?v=3" alt=""><div><b>Spiritual Core</b><small>陆能的记忆库</small></div></div>
       <button type="button" id="ringEnter">进库</button>
     </div>
     <div class="ring-title"><span>陆能的年轮</span><small id="ringDate"></small></div>
     <canvas id="ringCanvas"></canvas>
-    <div class="ring-card"><div class="ring-stat" id="ringStat"></div><div class="ring-legend" id="ringLegend"></div></div>
+    <div class="ring-card"><div class="ring-stat" id="ringStat"></div></div>
     <div class="ring-pick" id="ringPick" hidden></div>
   </section>
   </div>
@@ -1728,8 +1728,6 @@
     work: "#e8cdb4", daily: "#d9f0b0", inner: "#f0c4ff", dream: "#c9bcff", note: "#cbbfe0",
     anchor: "#ffffff", handoff: "#a99cc8", raw: "#a99cc8",
   };
-  const RING_LEGEND = [["diary", "日记"], ["intimate", "亲密"], ["image", "照片"], ["excerpt", "原话"],
-    ["memory", "记忆"], ["plan", "计划"], ["anchor", "锚点"]];
   const rc = $("#ringCanvas"), rx = rc.getContext("2d");
   let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
   const ringView = { k: 1, yaw: 0, pitch: 1.02 };
@@ -1938,7 +1936,6 @@
       } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
       $("#ringStat").innerHTML = `<div><b>${ring.n}</b>圈</div><div><b>${ring.dots.length}</b>颗星</div><div><b>+${ring.counts[ring.n - 1]}</b>今天</div>`;
       $("#ringDate").textContent = ring.end.replaceAll("-", " · ");
-      $("#ringLegend").innerHTML = RING_LEGEND.map(([k, n]) => `<span><i style="background:${RING_KINDS[k]}"></i>${n}</span>`).join("");
       ringT0 = performance.now();
     }
     if (!ringLoop) { ringLoop = true; ringLast = 0; requestAnimationFrame(ringFrame); }
