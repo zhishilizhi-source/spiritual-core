@@ -1705,23 +1705,28 @@
 
   // --- 年轮: one ring a day, grown out of the seed; …/?demo#rings shows made-up rings for filming ---
   const RING_KINDS = {
-    diary: "#f2c46d", weekly: "#f2c46d", monthly: "#f2c46d", intimate: "#ff6f8e", image: "#7fd1c7",
-    memory: "#8fb6ff", excerpt: "#c9a7ff", letter: "#ffd6a5", message: "#ff9ecb", plan: "#ffa463",
-    work: "#ffa463", daily: "#b8e07a", inner: "#e58cff", dream: "#9e8cff", note: "#a9b3c9",
-    anchor: "#ffffff", handoff: "#6c7896", raw: "#4a5370",
+    diary: "#f0c879", weekly: "#f0c879", monthly: "#f0c879", intimate: "#f08aa0", image: "#8fd3c8",
+    memory: "#9db8e8", excerpt: "#c7b0f0", letter: "#f3d3a8", message: "#f2a7c3", plan: "#e8a878",
+    work: "#c9a27e", daily: "#b9d39a", inner: "#d9a0f0", dream: "#a99cf0", note: "#7d8299",
+    anchor: "#fff6e6", handoff: "#5a5f78", raw: "#4d5168",
   };
   const RING_LEGEND = [["diary", "日记"], ["intimate", "亲密"], ["image", "照片"], ["memory", "记忆"],
     ["excerpt", "原话"], ["plan", "计划"], ["inner", "心里话"], ["dream", "梦"], ["anchor", "锚点"]];
   const rc = $("#ringCanvas"), rx = rc.getContext("2d");
   let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
   const ringView = { k: 1, yaw: 0, pitch: 1.02 };
-  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h ^= h >>> 16; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;   // mix, or "a1" and "a2" land side by side
+    return (h >>> 0) / 4294967296; };
   // the same grain runs through every ring, drifting a little outward, like a real cut log
   const wob = (t, i) => 1 + .028 * Math.sin(3 * t + .8 + i * .004) + .016 * Math.sin(5 * t + 2.1 + i * .011) + .008 * Math.sin(11 * t + i * .03);
   const dayNum = (s) => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
   // how high a star floats over its ring: the heavier the record, the higher
   const LIFT = { anchor: .2, diary: .13, intimate: .13, excerpt: .1, letter: .1, image: .08, inner: .08, dream: .07,
     memory: .05, plan: .05, work: .04, daily: .04, message: .05, note: .02, handoff: .015, raw: .01 };
+  // a few far stars behind everything, barely there
+  const sky = Array.from({ length: 70 }, (_, n) => ({ x: hash01("sx" + n), y: hash01("sy" + n), r: hash01("sr" + n) < .85 ? 1 : 1.6, p: hash01("sp" + n) * 9 }));
+  const STAR = new Set(["diary", "intimate", "anchor", "excerpt", "letter", "image"]), FAINT = new Set(["raw", "handoff", "note"]);
   const dust = Array.from({ length: 70 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .15 + hash01("r" + n) * 1.05, y: hash01("y" + n) * .6, v: .00012 + hash01("v" + n) * .00025 }));
 
   function shapeRings(data) {
@@ -1737,7 +1742,8 @@
       const m = /T(\d\d):(\d\d)/.exec(d.created_at || "");
       const h = m ? +m[1] + m[2] / 60 : 12;   // midnight at the back, noon at the front
       const jr = hash01(d.id);
-      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2, jr, lift: d.pinned ? .32 : (LIFT[d.kind] ?? .04) * (.7 + jr * .6) };
+      // records written in the same minute would stack into one lump, so each leans a little aside
+      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2 + (hash01("j" + d.id) - .5) * .5, jr, lift: d.pinned ? .32 : (LIFT[d.kind] ?? .04) * (.7 + jr * .6) };
     });
     // threads: two records whose titles share at least two word-pairs; words in everything don't count
     const grams = dots.map((d) => {
@@ -1779,6 +1785,9 @@
     if (rc.width !== Math.round(W * dpr) || rc.height !== Math.round(H * dpr)) { rc.width = Math.round(W * dpr); rc.height = Math.round(H * dpr); }
     rx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rx.clearRect(0, 0, W, H);
+    rx.fillStyle = "#d8cfee";
+    for (const t of sky) { rx.globalAlpha = .12 + .12 * Math.sin(now / 1700 + t.p); rx.fillRect(t.x * W, t.y * H, t.r, t.r); }
+    rx.globalAlpha = 1;
     if (!ring) return;
     if (now > ringHeld) ringView.yaw += dt * .00006;   // turns by itself unless a finger is on it
     const k = Math.min(W * .43, H * .4) * ringView.k, cx = W / 2, cy = H * .5, F = 3.2;
@@ -1795,14 +1804,14 @@
     // the seed beats
     const [sx, sy, , ss] = proj(0, 0, 0), beat = 1 + .12 * Math.max(0, Math.sin(now / 190)) * Math.max(0, Math.sin(now / 950));
     const g = rx.createRadialGradient(sx, sy, 0, sx, sy, R0 * k * ss * 1.6 * beat);
-    g.addColorStop(0, "rgba(255,214,140,.85)"); g.addColorStop(.4, "rgba(242,196,109,.35)"); g.addColorStop(1, "rgba(242,196,109,0)");
+    g.addColorStop(0, "rgba(255,220,160,.6)"); g.addColorStop(.4, "rgba(242,196,109,.18)"); g.addColorStop(1, "rgba(242,196,109,0)");
     rx.fillStyle = g; rx.beginPath(); rx.arc(sx, sy, R0 * k * ss * 1.6 * beat, 0, 7); rx.fill();
 
     for (let i = 0; i < shown; i++) {
       const r = R0 + step * (i + 1), c = Math.min(ring.counts[i], 24) / 24, last = i === ring.n - 1;
       rx.strokeStyle = last ? `rgba(242,196,109,${.55 + .3 * Math.sin(now / 420)})`
-        : `rgba(232,196,150,${(ring.months[i] ? .34 : .05) + c * .4})`;
-      rx.lineWidth = last ? 2 : ring.months[i] ? 1.1 : .5 + c * 1.5;   // a busy day leaves a thicker ring
+        : `rgba(232,196,150,${(ring.months[i] ? .3 : .045) + c * .2})`;
+      rx.lineWidth = last ? 1.6 : ring.months[i] ? .9 : .5 + c * .5;   // a busy day leaves a slightly bolder ring
       rx.beginPath();
       for (let j = 0; j <= 120; j++) { const [x, y] = onRing(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
       rx.stroke();
@@ -1821,13 +1830,14 @@
     // stems from each floating star down to its ring
     rx.lineWidth = .6;
     for (const d of live) {
-      if (d.lift < .06) continue;
+      if (d.lift < .06 || !STAR.has(d.kind)) continue;
       rx.strokeStyle = `rgba(232,196,150,${.1 + d.lift * .5})`;
       rx.beginPath(); rx.moveTo(d.bx, d.by); rx.lineTo(d.sx, d.sy); rx.stroke();
     }
     // threads between records about the same thing, bowed upward
-    for (const [a, b, s] of ring.edges) {
-      if (a.sx == null || b.sx == null) continue;
+    // threads stay hidden until a star is picked; then only its own light up
+    for (const [a, b, s] of ringPicked ? ring.edges : []) {
+      if (a.sx == null || b.sx == null || (a !== ringPicked && b !== ringPicked)) continue;
       const hot = ringPicked && (a === ringPicked || b === ringPicked);
       rx.strokeStyle = hot ? "rgba(255,236,200,.85)" : `rgba(201,167,255,${.05 + Math.min(s, 5) * .03})`;
       rx.lineWidth = hot ? 1.3 : .7;
@@ -1835,14 +1845,21 @@
       rx.beginPath(); rx.moveTo(a.sx, a.sy); rx.quadraticCurveTo(mx, my, b.sx, b.sy); rx.stroke();
     }
 
-    rx.globalCompositeOperation = "lighter";
+    // only the ones that matter glow; the rest is fine dust, so the slice never turns into one white lump
     live.sort((a, b) => b.z - a.z);   // far ones first
     for (const d of live) {
-      const big = (d.pinned ? 3.4 : ["diary", "intimate", "anchor", "excerpt"].includes(d.kind) ? 2.1 : ["raw", "handoff", "note"].includes(d.kind) ? 1 : 1.5) * zoom * d.s;
-      rx.fillStyle = RING_KINDS[d.kind] || "#a9b3c9";
-      rx.globalAlpha = .16 * d.s; rx.beginPath(); rx.arc(d.sx, d.sy, big * 2.8, 0, 7); rx.fill();
-      rx.globalAlpha = (d.sealed ? .45 : .95) * Math.min(1, d.s); rx.beginPath(); rx.arc(d.sx, d.sy, big, 0, 7); rx.fill();
+      const star = d.pinned || STAR.has(d.kind), faint = FAINT.has(d.kind);
+      const big = (d.pinned ? 2.4 : star ? 1.5 : faint ? .6 : 1) * zoom * d.s;
+      rx.fillStyle = RING_KINDS[d.kind] || "#7d8299";
+      if (star) {
+        rx.globalCompositeOperation = "lighter"; rx.globalAlpha = .09;
+        rx.beginPath(); rx.arc(d.sx, d.sy, big * 4, 0, 7); rx.fill();
+        rx.globalCompositeOperation = "source-over";
+      }
+      rx.globalAlpha = faint ? .35 : d.sealed ? .45 : .85;
+      rx.beginPath(); rx.arc(d.sx, d.sy, big, 0, 7); rx.fill();
     }
+    rx.globalCompositeOperation = "lighter";
     // dust rising off the wood
     rx.fillStyle = "#f6dcb0";
     for (const m of dust) {
@@ -1854,7 +1871,8 @@
     rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
 
     rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(233,223,210,.7)";
-    ring.months.forEach((m, i) => { if (m && i < shown) { const [x, y] = onRing(Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y + 13); } });
+    ring.months.forEach((m, i) => { if (m && i < shown && i < ring.n - 4) {   // the newest month gives way to 今天
+      const [x, y] = onRing(Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y + 13); } });
     if (shown >= ring.n - .5) {
       const [x, y] = onRing(Math.PI / 2, 1, ring.n - 1);
       rx.fillStyle = "#f2c46d"; rx.fillText("今天", x, y + 15);
