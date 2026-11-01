@@ -554,26 +554,40 @@
   body[data-page="rings"] > h1, body[data-page="rings"] .pages, body[data-page="rings"] .mood, body[data-page="rings"] #us { display: none; }
   body > h1 img, body > h1 > span:not(.theme) { cursor: pointer; }
   html:has(body[data-page="rings"]), body[data-page="rings"] { overflow: hidden; }
-  .rings { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; color: #e9dfd2;
-           background: radial-gradient(ellipse at 50% 36%, #2c2340, #120f1c 72%);
-           padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
-  .ring-top { text-align: center; }
-  .rings { font-family: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif; }
-  .ring-top span { font-size: 18px; font-weight: 300; letter-spacing: 8px; color: #f4e6d0; }
+  /* the home: our dusk, the same sky as the icon, sinking from peach into night; the rings float in it */
+  .rings { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; color: #fff6ec; overflow: hidden;
+           font-family: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif;
+           background:
+             radial-gradient(120% 55% at 50% 68%, rgba(255,196,170,.28), transparent 60%),
+             linear-gradient(180deg, #f2c3b1 0%, #d9a9bd 18%, #a988bd 40%, #6f5a9e 64%, #3b2f66 84%, #231c40 100%);
+           padding: max(14px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom)); }
+  .ring-head { display: flex; align-items: center; gap: 10px; }
+  .ring-brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+  .ring-brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 4px 14px rgba(80,50,110,.25); }
+  .ring-brand b { display: block; font-size: 17px; font-weight: 500; letter-spacing: 3px; color: #4a3560; line-height: 1.1; }
+  .ring-brand small { display: block; font-size: 10px; letter-spacing: 2px; color: #7a5f8c; font-family: -apple-system, "Helvetica Neue", sans-serif; }
+  #ringEnter { flex: none; color: #4a3560; background: rgba(255,255,255,.35); border: 1px solid rgba(255,255,255,.55);
+               backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+               border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; letter-spacing: 2px; }
+  .ring-title { text-align: center; margin-top: 18px; }
+  .ring-title span { font-size: 22px; font-weight: 300; letter-spacing: 10px; color: #4a3560; padding-left: 10px; }
+  .ring-title small { display: block; font-size: 11px; letter-spacing: 3px; color: #7a5f8c; margin-top: 4px; }
   #ringCanvas { display: block; flex: 1 1 0; min-height: 0; width: 100%; touch-action: none; cursor: grab; }
-  .ring-stat { display: block; font-size: 11px; color: #9d927f; margin-top: 4px; letter-spacing: 1px; }
-  .ring-stat b { color: #e8c98e; font-weight: 400; }
-  .ring-foot { display: flex; align-items: center; gap: 10px; }
-  #ringEnter { flex: none; background: rgba(255,255,255,.08); color: #f4e6d0; border: 1px solid rgba(255,255,255,.18);
-               border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; }
-  .ring-legend { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; color: #b9ae9f; }
-  .ring-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
-  .ring-pick { position: absolute; left: 14px; right: 14px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 56px);
-               background: rgba(30,24,40,.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-               border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.55; }
-  .ring-pick .rk { font-size: 12px; color: #b9ae9f; }
-  .ring-pick .rt { font-weight: 600; margin: 2px 0; color: #f4ece2; }
-  .ring-pick .rb { color: #d6cbbd; white-space: pre-wrap; }
+  .ring-card { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 18px;
+               backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding: 12px 14px 10px; }
+  .ring-stat { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+  .ring-stat div { font-size: 11px; letter-spacing: 2px; color: rgba(255,240,228,.6); }
+  .ring-stat b { display: block; font-size: 24px; font-weight: 300; letter-spacing: 0; color: #fff3e6; line-height: 1.25; }
+  .ring-stat div + div { border-left: 1px solid rgba(255,255,255,.12); }
+  .ring-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 12px; font-size: 11px; color: rgba(255,240,228,.6);
+                 margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.1); }
+  .ring-legend i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+  .ring-pick { position: absolute; left: 18px; right: 18px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 118px);
+               background: rgba(40,30,70,.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+               border: 1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 11px 14px; font-size: 14px; line-height: 1.6; }
+  .ring-pick .rk { font-size: 11px; letter-spacing: 1px; color: rgba(255,240,228,.65); }
+  .ring-pick .rt { font-weight: 500; margin: 2px 0; color: #fff6ec; }
+  .ring-pick .rb { color: rgba(255,240,228,.82); white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -599,9 +613,13 @@
 
   <div class="page" data-page="rings" hidden>
   <section class="rings" aria-label="年轮">
-    <div class="ring-top"><span>陆能的年轮</span><small class="ring-stat" id="ringStat"></small></div>
+    <div class="ring-head">
+      <div class="ring-brand"><img src="static/icon-192.png?v=3" alt=""><div><b>灵核</b><small>SPIRITUAL CORE</small></div></div>
+      <button type="button" id="ringEnter">进库</button>
+    </div>
+    <div class="ring-title"><span>陆能的年轮</span><small id="ringDate"></small></div>
     <canvas id="ringCanvas"></canvas>
-    <div class="ring-foot"><div class="ring-legend" id="ringLegend"></div><button type="button" id="ringEnter">进库</button></div>
+    <div class="ring-card"><div class="ring-stat" id="ringStat"></div><div class="ring-legend" id="ringLegend"></div></div>
     <div class="ring-pick" id="ringPick" hidden></div>
   </section>
   </div>
@@ -1705,13 +1723,13 @@
 
   // --- 年轮: one ring a day, grown out of the seed; …/?demo#rings shows made-up rings for filming ---
   const RING_KINDS = {
-    diary: "#f0c879", weekly: "#f0c879", monthly: "#f0c879", intimate: "#f08aa0", image: "#8fd3c8",
-    memory: "#9db8e8", excerpt: "#c7b0f0", letter: "#f3d3a8", message: "#f2a7c3", plan: "#e8a878",
-    work: "#c9a27e", daily: "#b9d39a", inner: "#d9a0f0", dream: "#a99cf0", note: "#7d8299",
-    anchor: "#fff6e6", handoff: "#5a5f78", raw: "#4d5168",
+    diary: "#ffd98c", weekly: "#ffd98c", monthly: "#ffd98c", intimate: "#ff9a80", image: "#9ff0dc",
+    memory: "#d6e2ff", excerpt: "#ffd6f2", letter: "#ffe6c4", message: "#ffb8cf", plan: "#ffc28f",
+    work: "#e8cdb4", daily: "#d9f0b0", inner: "#f0c4ff", dream: "#c9bcff", note: "#cbbfe0",
+    anchor: "#ffffff", handoff: "#a99cc8", raw: "#a99cc8",
   };
-  const RING_LEGEND = [["diary", "日记"], ["intimate", "亲密"], ["image", "照片"], ["memory", "记忆"],
-    ["excerpt", "原话"], ["plan", "计划"], ["inner", "心里话"], ["dream", "梦"], ["anchor", "锚点"]];
+  const RING_LEGEND = [["diary", "日记"], ["intimate", "亲密"], ["image", "照片"], ["excerpt", "原话"],
+    ["memory", "记忆"], ["plan", "计划"], ["anchor", "锚点"]];
   const rc = $("#ringCanvas"), rx = rc.getContext("2d");
   let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
   const ringView = { k: 1, yaw: 0, pitch: 1.02 };
@@ -1785,12 +1803,12 @@
     if (rc.width !== Math.round(W * dpr) || rc.height !== Math.round(H * dpr)) { rc.width = Math.round(W * dpr); rc.height = Math.round(H * dpr); }
     rx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rx.clearRect(0, 0, W, H);
-    rx.fillStyle = "#d8cfee";
-    for (const t of sky) { rx.globalAlpha = .12 + .12 * Math.sin(now / 1700 + t.p); rx.fillRect(t.x * W, t.y * H, t.r, t.r); }
+    rx.fillStyle = "#fff4e8";
+    for (const t of sky) { rx.globalAlpha = (.14 + .14 * Math.sin(now / 1700 + t.p)) * Math.max(0, t.y * 1.6 - .5); rx.fillRect(t.x * W, t.y * H, t.r, t.r); }
     rx.globalAlpha = 1;
     if (!ring) return;
     if (now > ringHeld) ringView.yaw += dt * .00006;   // turns by itself unless a finger is on it
-    const k = Math.min(W * .43, H * .4) * ringView.k, cx = W / 2, cy = H * .5, F = 3.2;
+    const k = Math.min(W * .44, H * .42) * ringView.k, cx = W / 2, cy = H * .46, F = 3.2;
     const cyw = Math.cos(ringView.yaw), syw = Math.sin(ringView.yaw), cp = Math.cos(ringView.pitch), sp = Math.sin(ringView.pitch);
     const proj = (x, y, z) => {
       const x1 = x * cyw - z * syw, z1 = x * syw + z * cyw;
@@ -1801,16 +1819,38 @@
     const p = Math.min(1, (now - ringT0) / 3200), shown = ring.n * (1 - Math.pow(1 - p, 3));
     const onRing = (t, r, i, y = 0) => { const w = r * wob(t, i); return proj(Math.cos(t) * w, y, Math.sin(t) * w); };
 
+    // a soft shadow far under the slice, so it hangs in the air
+    const [hx, hy, , hs] = proj(0, -1.1, 0);
+    rx.save(); rx.translate(hx, hy); rx.scale(1, .3);
+    const sh = rx.createRadialGradient(0, 0, 0, 0, 0, k * .8 * hs);
+    sh.addColorStop(0, "rgba(28,18,58,.32)"); sh.addColorStop(1, "rgba(28,18,58,0)");
+    rx.fillStyle = sh; rx.beginPath(); rx.arc(0, 0, k * .8 * hs, 0, 7); rx.fill();
+    rx.restore();
+    // the cut face, a little lighter than the sky behind it
+    rx.beginPath();
+    for (let j = 0; j <= 120; j++) { const [x, y] = onRing(j / 120 * 2 * Math.PI, R0 + step * ring.n * Math.min(1, shown / ring.n), ring.n - 1); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
+    const fc = rx.createRadialGradient(cx, cy, 0, cx, cy, k);
+    fc.addColorStop(0, "rgba(255,236,226,.16)"); fc.addColorStop(1, "rgba(255,236,226,.05)");
+    rx.fillStyle = fc; rx.fill();
+
     // the seed beats
     const [sx, sy, , ss] = proj(0, 0, 0), beat = 1 + .12 * Math.max(0, Math.sin(now / 190)) * Math.max(0, Math.sin(now / 950));
     const g = rx.createRadialGradient(sx, sy, 0, sx, sy, R0 * k * ss * 1.6 * beat);
-    g.addColorStop(0, "rgba(255,220,160,.6)"); g.addColorStop(.4, "rgba(242,196,109,.18)"); g.addColorStop(1, "rgba(242,196,109,0)");
+    g.addColorStop(0, "rgba(255,226,200,.75)"); g.addColorStop(.4, "rgba(255,190,160,.22)"); g.addColorStop(1, "rgba(255,190,160,0)");
     rx.fillStyle = g; rx.beginPath(); rx.arc(sx, sy, R0 * k * ss * 1.6 * beat, 0, 7); rx.fill();
+    // our mark at the heart: the cream moon and the salmon one
+    const mr = 7 * ss * Math.min(2, Math.sqrt(ringView.k));
+    const moon = (ox, col, cut) => {
+      rx.save(); rx.beginPath(); rx.arc(sx + ox, sy, mr, 0, 7); rx.arc(sx + ox + cut, sy - mr * .08, mr * .86, 0, 7, true);
+      rx.fillStyle = col; rx.fill("evenodd"); rx.restore();
+    };
+    moon(-mr * .28, "#fff6ec", mr * .5);
+    moon(mr * .42, "#f4997b", -mr * .45);
 
     for (let i = 0; i < shown; i++) {
       const r = R0 + step * (i + 1), c = Math.min(ring.counts[i], 24) / 24, last = i === ring.n - 1;
-      rx.strokeStyle = last ? `rgba(242,196,109,${.55 + .3 * Math.sin(now / 420)})`
-        : `rgba(232,196,150,${(ring.months[i] ? .3 : .045) + c * .2})`;
+      rx.strokeStyle = last ? `rgba(255,170,140,${.6 + .3 * Math.sin(now / 420)})`
+        : `rgba(255,244,232,${(ring.months[i] ? .38 : .06) + c * .22})`;
       rx.lineWidth = last ? 1.6 : ring.months[i] ? .9 : .5 + c * .5;   // a busy day leaves a slightly bolder ring
       rx.beginPath();
       for (let j = 0; j <= 120; j++) { const [x, y] = onRing(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
@@ -1831,7 +1871,7 @@
     rx.lineWidth = .6;
     for (const d of live) {
       if (d.lift < .06 || !STAR.has(d.kind)) continue;
-      rx.strokeStyle = `rgba(232,196,150,${.1 + d.lift * .5})`;
+      rx.strokeStyle = `rgba(255,244,232,${.12 + d.lift * .5})`;
       rx.beginPath(); rx.moveTo(d.bx, d.by); rx.lineTo(d.sx, d.sy); rx.stroke();
     }
     // threads between records about the same thing, bowed upward
@@ -1861,7 +1901,7 @@
     }
     rx.globalCompositeOperation = "lighter";
     // dust rising off the wood
-    rx.fillStyle = "#f6dcb0";
+    rx.fillStyle = "#fff1dc";
     for (const m of dust) {
       m.y += m.v * dt; if (m.y > .7) m.y = 0;
       const [x, y, , s] = proj(Math.cos(m.a) * m.r, m.y, Math.sin(m.a) * m.r);
@@ -1870,12 +1910,12 @@
     }
     rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
 
-    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(233,223,210,.7)";
+    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(255,244,232,.72)";
     ring.months.forEach((m, i) => { if (m && i < shown && i < ring.n - 4) {   // the newest month gives way to 今天
       const [x, y] = onRing(Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y + 13); } });
     if (shown >= ring.n - .5) {
       const [x, y] = onRing(Math.PI / 2, 1, ring.n - 1);
-      rx.fillStyle = "#f2c46d"; rx.fillText("今天", x, y + 15);
+      rx.fillStyle = "#ffc2ad"; rx.fillText("今天", x, y + 15);
     }
     if (ringPicked && ringPicked.sx != null) {
       rx.strokeStyle = "#fff"; rx.lineWidth = 1.2;
@@ -1896,7 +1936,8 @@
       try {
         ring = shapeRings(location.search.includes("demo") ? fakeRings() : await (await fetch("api/rings")).json());
       } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
-      $("#ringStat").innerHTML = `<b>${ring.n}</b> 圈 · <b>${ring.dots.length}</b> 颗星 · <b>${ring.edges.length}</b> 根线`;
+      $("#ringStat").innerHTML = `<div><b>${ring.n}</b>圈</div><div><b>${ring.dots.length}</b>颗星</div><div><b>+${ring.counts[ring.n - 1]}</b>今天</div>`;
+      $("#ringDate").textContent = ring.end.replaceAll("-", " · ");
       $("#ringLegend").innerHTML = RING_LEGEND.map(([k, n]) => `<span><i style="background:${RING_KINDS[k]}"></i>${n}</span>`).join("");
       ringT0 = performance.now();
     }
