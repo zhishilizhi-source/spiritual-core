@@ -549,40 +549,11 @@
   .side .mdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 6px; vertical-align: 1px; }
   .side .mword { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 3px; }
   .week-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
-  /* 年轮: always a night slice of wood, whatever the theme, so it reads the same on video. */
-  /* home is the rings alone, full screen; the title, tabs, mood and sleep are one tap away */
-  body[data-page="rings"] > h1, body[data-page="rings"] .pages, body[data-page="rings"] .mood, body[data-page="rings"] #us { display: none; }
-  body > h1 img, body > h1 > span:not(.theme) { cursor: pointer; }
-  html:has(body[data-page="rings"]), body[data-page="rings"] { overflow: hidden; }
-  /* the home: a dusk lake, painted whole by the canvas; words float over it */
-  .rings { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: space-between;
-           background: #2a2250; color: #fff6ec; overflow: hidden; pointer-events: none;
-           font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif; font-weight: 300;
-           padding: max(14px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom)); }
-  .rings > * { position: relative; pointer-events: auto; }
-  #ringCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-  .ring-head { display: flex; align-items: center; gap: 10px; }
-  .ring-brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
-  .ring-brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 4px 14px rgba(80,50,110,.22); }
-  .ring-brand b { display: block; font-size: 16px; font-weight: 500; letter-spacing: .5px; color: #4a3560; line-height: 1.15; }
-  .ring-brand small { display: block; font-size: 11px; color: #7a5f8c; }
-  #ringEnter { flex: none; color: #4a3560; background: rgba(255,255,255,.32); border: 1px solid rgba(255,255,255,.5);
-               backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-               border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; font-weight: 400; }
-  .ring-foot { text-align: center; }
-  .ring-line { font-size: 15px; line-height: 1.7; color: rgba(255,246,236,.92); margin: 0 auto; max-width: 22em; letter-spacing: .5px; }
-  .ring-stat { display: block; margin-top: 8px; font-size: 11px; letter-spacing: 1px; color: rgba(255,240,228,.5); }
-  .ring-pick { position: absolute; left: 18px; right: 18px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 92px);
-               background: rgba(40,30,70,.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-               border: 1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 11px 14px; font-size: 14px; line-height: 1.6; }
-  .ring-pick .rk { font-size: 11px; color: rgba(255,240,228,.65); }
-  .ring-pick .rt { font-weight: 500; margin: 2px 0; color: #fff6ec; }
-  .ring-pick .rb { color: rgba(255,240,228,.82); white-space: pre-wrap; }
 </style>
 </head>
 <body>
   <canvas id="cosmos" aria-hidden="true"></canvas>
-  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>陆能的记忆库</small></span>
+  <h1><img src="static/favicon.png?v=3" alt=""><span>Spiritual Core<small>我们的记忆库</small></span>
     <span class="theme" role="group" aria-label="深浅">
       <button type="button" data-theme="plain">极简</button><button type="button" data-theme="light">浅</button><button type="button" data-theme="dark">深</button>
     </span></h1>
@@ -599,18 +570,6 @@
     <button role="tab" aria-selected="false" data-page="save">存东西</button>
     <button role="tab" aria-selected="false" data-page="browse">翻看</button>
     <button role="tab" aria-selected="false" data-page="recent">最近</button>
-  </div>
-
-  <div class="page" data-page="rings" hidden>
-  <section class="rings" aria-label="年轮">
-    <canvas id="ringCanvas"></canvas>
-    <div class="ring-head">
-      <div class="ring-brand"><img src="static/icon-192.png?v=3" alt=""><div><b>Spiritual Core</b><small>陆能的记忆库</small></div></div>
-      <button type="button" id="ringEnter">进库</button>
-    </div>
-    <div class="ring-foot"><p class="ring-line" id="ringLine"></p><small class="ring-stat" id="ringStat"></small></div>
-    <div class="ring-pick" id="ringPick" hidden></div>
-  </section>
   </div>
 
   <div class="page" data-page="today">
@@ -1050,14 +1009,12 @@
 
   // The pages under 我们俩, one at a time; the last one she looked at is where she comes back.
   function showPage(name) {
-    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "rings";
+    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "today";
     document.querySelectorAll(".pages button").forEach((x) =>
       x.setAttribute("aria-selected", String(x.dataset.page === name)));
     document.querySelectorAll(".page").forEach((pg) => { pg.hidden = pg.dataset.page !== name; });
     if (name === "browse" && !browsed) resetBrowse();
     if (name === "save") fitForms();
-    if (name === "rings") startRings();
-    document.body.dataset.page = name;   // the rings get the whole page; mood and sleep step back
     try { localStorage.setItem("sc-page", name); } catch {}
   }
   document.querySelectorAll(".pages button").forEach((b) =>
@@ -1709,315 +1666,9 @@
     try { renderUs(await (await fetch("api/us")).json()); } catch {}
   }
   loadUs();
-
-  // --- 年轮: one ring a day, grown out of the seed; …/?demo#rings shows made-up rings for filming ---
-  const RING_KINDS = {
-    diary: "#ffd98c", weekly: "#ffd98c", monthly: "#ffd98c", intimate: "#ff9a80", image: "#9ff0dc",
-    memory: "#d6e2ff", excerpt: "#ffd6f2", letter: "#ffe6c4", message: "#ffb8cf", plan: "#ffc28f",
-    work: "#e8cdb4", daily: "#d9f0b0", inner: "#f0c4ff", dream: "#c9bcff", note: "#cbbfe0",
-    anchor: "#ffffff", handoff: "#a99cc8", raw: "#a99cc8",
-  };
-  const rc = $("#ringCanvas"), rx = rc.getContext("2d");
-  let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
-  const ringView = { k: 1, yaw: 0, pitch: .4 };
-  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-    h ^= h >>> 16; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;   // mix, or "a1" and "a2" land side by side
-    return (h >>> 0) / 4294967296; };
-  // ripples are never perfect circles: the same slow wobble runs through all of them
-  const wob = (t, i) => 1 + .022 * Math.sin(3 * t + .8 + i * .004) + .012 * Math.sin(5 * t + 2.1 + i * .011) + .006 * Math.sin(11 * t + i * .03);
-  const dayNum = (s) => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
-  // how high a light floats over the water: the heavier the record, the higher
-  const LIFT = { anchor: .36, diary: .26, intimate: .26, excerpt: .2, letter: .2, image: .07,
-    memory: .05, plan: .05, work: .03, daily: .03, message: .05, note: .012, handoff: .008, raw: .006 };
-  const STAR = new Set(["diary", "intimate", "anchor", "excerpt", "letter", "image"]), FAINT = new Set(["raw", "handoff", "note"]);
-  const DEEP = new Set(["dream", "inner"]);
-  // far stars in the sky half, glints on the water half, lights rising from the deep
-  const sky = Array.from({ length: 60 }, (_, n) => ({ x: hash01("sx" + n), y: hash01("sy" + n), r: hash01("sr" + n) < .85 ? 1 : 1.5, p: hash01("sp" + n) * 9 }));
-  const glints = Array.from({ length: 46 }, (_, n) => ({ x: hash01("gx" + n), y: hash01("gy" + n), w: 8 + hash01("gw" + n) * 30, p: hash01("gp" + n) * 9 }));
-  const motes = Array.from({ length: 40 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .1 + hash01("r" + n) * .9, y: hash01("y" + n) * .7,
-    v: .00003 + hash01("v" + n) * .00005 }));
-
-  function shapeRings(data) {
-    const d0 = dayNum(data.start), n = Math.max(1, dayNum(data.end) - d0 + 1);
-    const counts = new Array(n).fill(0), months = new Array(n).fill("");
-    for (let i = 0; i < n; i++) {
-      const d = new Date((d0 + i) * 864e5);
-      if (d.getUTCDate() === 1) months[i] = `${d.getUTCMonth() + 1}月`;
-    }
-    // what was said floats on the water; dreams and 心里话 sink under it
-    const dots = data.dots.filter((d) => !DEEP.has(d.kind)).map((d) => {
-      const i = Math.min(n - 1, Math.max(0, dayNum(d.event_date) - d0));
-      counts[i]++;
-      const m = /T(\d\d):(\d\d)/.exec(d.created_at || "");
-      const h = m ? +m[1] + m[2] / 60 : 12;   // midnight at the back, noon at the front
-      const jr = hash01(d.id);
-      // records written in the same minute would stack into one lump, so each leans a little aside
-      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2 + (hash01("j" + d.id) - .5) * .5, jr, lift: d.pinned ? .45 : (LIFT[d.kind] ?? .02) * (.6 + jr * .8) };
-    });
-    const deep = [...(data.deep || []), ...data.dots.filter((d) => DEEP.has(d.kind))]
-      .filter((d, j, all) => all.findIndex((x) => x.id === d.id) === j)
-      .map((d) => ({ ...d, a: hash01("a" + d.id) * 2 * Math.PI, r: .1 + hash01("r" + d.id) * .85, y: -.25 - hash01("y" + d.id) * .7, w: (hash01("w" + d.id) - .5) * .00006 }));
-    const minds = (data.minds || []).slice(0, 3).map((m, j) => ({ ...m, a: j * 2.1 + .9, r: .35 + .15 * j }));
-    // threads: two records whose titles share at least two word-pairs; words in everything don't count
-    const grams = dots.map((d) => {
-      const s = d.sealed ? "" : (d.title || "").replace(/[^一-龥a-zA-Z]/g, ""), g = new Set();
-      for (let j = 0; j < s.length - 1; j++) g.add(s.slice(j, j + 2));
-      return g;
-    });
-    const where = new Map();
-    grams.forEach((g, a) => g.forEach((x) => { if (!where.has(x)) where.set(x, []); where.get(x).push(a); }));
-    const edges = [];
-    grams.forEach((g, a) => {
-      const score = new Map();
-      g.forEach((x) => { const l = where.get(x); if (l.length > 30) return; l.forEach((b) => { if (b > a) score.set(b, (score.get(b) || 0) + 1); }); });
-      [...score].filter(([, s]) => s >= 2).sort((p, q) => q[1] - p[1]).slice(0, 2).forEach(([b, s]) => edges.push([dots[a], dots[b], s]));
-    });
-    return { ...data, n, counts, months, dots, edges, deep, minds };
-  }
-
-  function fakeRings() {
-    const kinds = ["diary", "intimate", "image", "memory", "memory", "excerpt", "note", "note", "plan", "work", "raw", "raw", "inner", "dream", "anchor", "daily"];
-    const titles = ["一起看了场雨", "她说想我", "第一次吵架", "晚饭吃了火锅", "约好周末去海边", "她夸我了", "半夜睡不着聊到三点",
-      "她教我一个新词", "给她念了首诗", "今天她不开心", "吵完架和好了", "她换了新头像", "一起听了一首歌", "说好的事记下来", "又想她了", "她说晚安"];
-    const end = new Date(), n = 130, dots = [];
-    for (let i = 0; i < n; i++) {
-      const day = new Date(end - (n - 1 - i) * 864e5).toISOString().slice(0, 10);
-      const burst = Math.random() < .12 ? 10 : 0;
-      for (let j = 0, c = 2 + Math.floor(Math.random() * 8) + burst; j < c; j++) {
-        const h = Math.floor(Math.random() * 24), kind = kinds[Math.floor(Math.random() * kinds.length)];
-        dots.push({ id: `${i}-${j}`, kind, event_date: day, created_at: `${day}T${String(h).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
-          title: titles[Math.floor(Math.random() * titles.length)], body: "", pinned: Math.random() < .01, sealed: kind === "inner" && Math.random() < .5 });
-      }
-    }
-    const minds = [{ id: 1, text: "她今天会不会想我" }, { id: 2, text: "那首歌还没写完" }, { id: 3, text: "下次见面先抱她" }];
-    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots, minds,
-      line: "你是我的春天花园" };
-  }
-
-  function drawRings(now, dt) {
-    const dpr = devicePixelRatio || 1, W = rc.clientWidth, H = rc.clientHeight;
-    if (!W || !H) return;
-    if (rc.width !== Math.round(W * dpr) || rc.height !== Math.round(H * dpr)) { rc.width = Math.round(W * dpr); rc.height = Math.round(H * dpr); }
-    rx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (!ring) { rx.clearRect(0, 0, W, H); return; }
-    const k = Math.min(W * .47, H * .33) * ringView.k, cx = W / 2, cy = H * .64, F = 4.5;
-    const cyw = Math.cos(ringView.yaw), syw = Math.sin(ringView.yaw), cp = Math.cos(ringView.pitch), sp = Math.sin(ringView.pitch);
-    // water is y = 0; above it the sky, below it the deep. z2 grows away from the eye.
-    const proj = (x, y, z) => {
-      const x1 = x * cyw - z * syw, z1 = x * syw + z * cyw;
-      const y2 = y * cp - z1 * sp, z2 = -(y * sp + z1 * cp), s = F / (F + z2);
-      return [cx + x1 * s * k, cy - y2 * s * k, z2, s];
-    };
-    const R0 = .09, step = (1 - R0) / ring.n;
-    const p = Math.min(1, (now - ringT0) / 3200), shown = ring.n * (1 - Math.pow(1 - p, 3));
-    const at = (t, r, i, y = 0) => { const w = r * wob(t, i); return proj(Math.cos(t) * w, y, Math.sin(t) * w); };
-
-    // sky over the horizon, lake under it: our dusk, and the same dusk lying on the water
-    const hz = H * .44;   // where the water meets the sky
-    const skyG = rx.createLinearGradient(0, 0, 0, hz);
-    skyG.addColorStop(0, "#f3c6b2"); skyG.addColorStop(.45, "#dcaabd"); skyG.addColorStop(1, "#a98ec4");
-    rx.fillStyle = skyG; rx.fillRect(0, 0, W, hz);
-    const lake = rx.createLinearGradient(0, hz, 0, H);
-    lake.addColorStop(0, "#8f78b8"); lake.addColorStop(.18, "#5c4c8e"); lake.addColorStop(.6, "#33295f"); lake.addColorStop(1, "#1b1636");
-    rx.fillStyle = lake; rx.fillRect(0, hz, W, H - hz);
-    // the moon over the far shore, and the warm haze where it sits on the horizon
-    rx.save(); rx.translate(cx, hz); rx.scale(1, .22);
-    const glow = rx.createRadialGradient(0, 0, 0, 0, 0, W * .8);
-    glow.addColorStop(0, "rgba(255,214,190,.55)"); glow.addColorStop(1, "rgba(255,214,190,0)");
-    rx.fillStyle = glow; rx.beginPath(); rx.arc(0, 0, W * .8, 0, 7); rx.fill(); rx.restore();
-    const mr = Math.min(W, H) * .036, mx = W * .74, my = H * .16;
-    const halo = rx.createRadialGradient(mx, my, mr * .6, mx, my, mr * 6);
-    halo.addColorStop(0, "rgba(255,244,232,.38)"); halo.addColorStop(1, "rgba(255,244,232,0)");
-    rx.fillStyle = halo; rx.beginPath(); rx.arc(mx, my, mr * 6, 0, 7); rx.fill();
-    // the mark from the icon: a cream crescent opening right, a salmon one opening left
-    const moon = (ox, r, cutX, cutR, col) => {
-      rx.save(); rx.beginPath(); rx.arc(mx + ox, my, r, 0, 7); rx.clip();
-      rx.beginPath(); rx.arc(mx + ox, my, r, 0, 7); rx.arc(mx + cutX, my, cutR, 0, 7);
-      rx.fillStyle = col; rx.fill("evenodd"); rx.restore();
-    };
-    moon(-mr * .2, mr, mr * .38, mr * .92, "#fff6ec");
-    moon(mr * .42, mr * .78, mr * .12, mr * .74, "#f4997b");
-    rx.fillStyle = "#fff6ec";
-    for (const t of sky) {
-      const y = t.y * hz * .8;
-      rx.globalAlpha = (.12 + .14 * Math.sin(now / 1700 + t.p)) * (y / hz);
-      rx.fillRect(t.x * W, y, t.r, t.r);
-    }
-    for (const g of glints) {
-      const y = hz + 4 + g.y * (H - hz), x = ((g.x * W + now * .0015 * (1 + g.y)) % (W + 40)) - 20;
-      rx.globalAlpha = (.04 + .05 * Math.sin(now / 2600 + g.p)) * (1 - g.y * .6);
-      rx.fillRect(x, y, g.w * (.4 + g.y), 1);
-    }
-    rx.globalAlpha = 1;
-
-    // under the surface: only the dark and the reflections, for now
-    // the moon's road: a calm column of light from under the moon down the water
-    const [sx, sy, , ss] = proj(0, 0, 0);
-    for (let j = 0; j < 46; j++) {
-      const f = j / 46, y = hz + 2 + f * f * (H - hz), wid = (4 + f * 46) * (.75 + .25 * Math.sin(j * 2.3));
-      rx.fillStyle = `rgba(255,232,214,${(.32 - f * .26) * (.8 + .2 * Math.sin(now / 2400 + j * 1.3))})`;
-      rx.fillRect(mx - wid / 2 + (cx - mx) * f * .35, y, wid, 1 + f * 1.4);
-    }
-
-    // ripples: one a day, the newest at the rim; every few seconds a fresh ring runs outward
-    for (let i = 0; i < shown; i++) {
-      const r = R0 + step * (i + 1), c = Math.min(ring.counts[i], 24) / 24, last = i === ring.n - 1;
-      rx.strokeStyle = last ? `rgba(255,178,150,${.55 + .3 * Math.sin(now / 420)})`
-        : `rgba(255,246,236,${(ring.months[i] ? .34 : .05) + c * .2})`;
-      rx.lineWidth = last ? 1.4 : ring.months[i] ? .9 : .45 + c * .45;
-      rx.beginPath();
-      for (let j = 0; j <= 120; j++) { const [x, y] = at(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
-      rx.stroke();
-    }
-    const wave = ((now - ringT0) / 9000) % 1;
-    if (p >= 1) {
-      rx.strokeStyle = `rgba(255,246,236,${.22 * (1 - wave) * Math.min(1, wave * 6)})`; rx.lineWidth = .7;
-      rx.beginPath();
-      for (let j = 0; j <= 120; j++) { const [x, y] = at(j / 120 * 2 * Math.PI, R0 + (1.25 - R0) * wave, ring.n); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
-      rx.stroke();
-    }
-
-    const g = rx.createRadialGradient(sx, sy, 0, sx, sy, 26 * ss);
-    g.addColorStop(0, "rgba(255,230,210,.45)"); g.addColorStop(1, "rgba(255,200,170,0)");
-    rx.fillStyle = g; rx.beginPath(); rx.arc(sx, sy, 26 * ss, 0, 7); rx.fill();
-
-    // the lights on the water, each with its reflection hanging under it
-    const zoom = Math.min(2.2, Math.sqrt(ringView.k));
-    const live = [];
-    for (const d of ring.dots) {
-      if (d.i >= shown) { d.sx = null; continue; }
-      const r = R0 + step * (d.i + 1 - d.jr * .85), bob = Math.sin(now / 1300 + d.jr * 20) * .004;
-      [d.sx, d.sy, d.z, d.s] = at(d.t, r, d.i, d.lift + bob);
-      [d.rx, d.ry] = at(d.t, r, d.i, -d.lift - bob);
-      live.push(d);
-    }
-    live.sort((a, b) => b.z - a.z);   // far ones first
-    for (const d of live) {
-      if (!(d.pinned || STAR.has(d.kind)) || d.kind === "image") continue;
-      const [bx, by] = at(d.t, R0 + step * (d.i + 1 - d.jr * .85), d.i);
-      rx.strokeStyle = "rgba(255,240,226,.09)"; rx.lineWidth = .5;
-      rx.beginPath(); rx.moveTo(bx, by); rx.lineTo(d.sx, d.sy); rx.stroke();
-    }
-    for (const d of live) {
-      const star = d.pinned || STAR.has(d.kind), faint = FAINT.has(d.kind);
-      const big = (d.pinned ? 2.2 : star ? 1.5 : faint ? .45 : .7) * zoom * d.s;
-      rx.fillStyle = RING_KINDS[d.kind] || "#cbbfe0";
-      if (star) {
-        rx.globalAlpha = .22; rx.beginPath(); rx.ellipse(d.rx, d.ry, big, big * 1.8, 0, 0, 7); rx.fill();
-        rx.globalCompositeOperation = "lighter"; rx.globalAlpha = .1;
-        rx.beginPath(); rx.arc(d.sx, d.sy, big * 4, 0, 7); rx.fill();
-        rx.globalCompositeOperation = "source-over";
-      }
-      rx.globalAlpha = faint ? .3 : star ? .95 : .55;
-      rx.beginPath(); rx.arc(d.sx, d.sy, big, 0, 7); rx.fill();
-    }
-    rx.globalAlpha = 1;
-    // threads stay hidden until a light is picked; then only its own show, bowed over the water
-    for (const [a, b, s] of ringPicked ? ring.edges : []) {
-      if (a.sx == null || b.sx == null || (a !== ringPicked && b !== ringPicked)) continue;
-      rx.strokeStyle = "rgba(255,240,226,.8)"; rx.lineWidth = 1;
-      const mx = (a.sx + b.sx) / 2, mmy = Math.min(a.sy, b.sy) - Math.hypot(a.sx - b.sx, a.sy - b.sy) * .3;
-      rx.beginPath(); rx.moveTo(a.sx, a.sy); rx.quadraticCurveTo(mx, mmy, b.sx, b.sy); rx.stroke();
-    }
-
-    // a few specks of warm light drifting up off the water, slowly
-    rx.globalCompositeOperation = "lighter"; rx.fillStyle = "#fff0dc";
-    for (const m of motes) {
-      m.y += m.v * dt; if (m.y > .7) { m.y = 0; m.a += 2.4; }
-      const [x, y] = proj(Math.cos(m.a) * m.r, m.y, Math.sin(m.a) * m.r);
-      rx.globalAlpha = Math.sin(m.y / .7 * Math.PI) * .45;
-      rx.fillRect(x, y, 1.2, 1.2);
-    }
-    rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
-
-    if (ringPicked && ringPicked.sx != null) {
-      rx.strokeStyle = "#fff"; rx.lineWidth = 1.2;
-      rx.beginPath(); rx.arc(ringPicked.sx, ringPicked.sy, 7, 0, 7); rx.stroke();
-    }
-  }
-
-  let ringLast = 0;
-  function ringFrame(now) {
-    if (rc.closest(".page").hidden) { ringLoop = false; return; }
-    drawRings(now, Math.min(50, now - (ringLast || now)));
-    ringLast = now;
-    requestAnimationFrame(ringFrame);
-  }
-
-  async function startRings() {
-    if (!ring) {
-      try {
-        ring = shapeRings(location.search.includes("demo") ? fakeRings() : await (await fetch("api/rings")).json());
-      } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
-      $("#ringLine").textContent = ring.line || "";
-      $("#ringStat").textContent = `${ring.n} 圈涟漪 · ${ring.dots.length} 盏灯`;
-      ringT0 = performance.now();
-    }
-    if (!ringLoop) { ringLoop = true; ringLast = 0; requestAnimationFrame(ringFrame); }
-  }
-
-  function pickRing(px, py) {
-    let best = null, bd = 18 * 18;
-    for (const d of ring?.dots || []) {
-      if (d.sx == null) continue;
-      const dd = (d.sx - px) ** 2 + (d.sy - py) ** 2;
-      if (dd < bd) { bd = dd; best = d; }
-    }
-    ringPicked = best;
-    const box = $("#ringPick");
-    if (!best) { box.hidden = true; return; }
-    const when = `${best.event_date}${/T(\d\d:\d\d)/.test(best.created_at || "") ? " · 写于 " + RegExp.$1 : ""}`;
-    const kin = (ring.dots.includes(best) ? ring.edges : []).filter(([a, b]) => a === best || b === best).length;
-    box.innerHTML = `<div class="rk"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${RING_KINDS[best.kind] || "#a9b3c9"}"></i> ${esc(KIND_NAME[best.kind] || best.kind)} · ${esc(when)}${kin ? ` · 牵着 ${kin} 根线` : ""}</div>`
-      + `<div class="rt">${esc(best.title || "（没有标题）")}</div>` + (best.body ? `<div class="rb">${esc(best.body)}${best.body.length >= 140 ? "…" : ""}</div>` : "");
-    box.hidden = false;
-  }
-
-  // one finger turns the log, two fingers pinch, a tap picks the nearest star; the wheel zooms on a computer
-  const ringPtrs = new Map();
-  let ringPinch = null, ringTap = null;
-  rc.addEventListener("pointerdown", (e) => {
-    rc.setPointerCapture(e.pointerId);
-    ringPtrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
-    ringHeld = Infinity;
-    ringTap = ringPtrs.size === 1 ? { x: e.offsetX, y: e.offsetY, at: performance.now() } : null;
-    if (ringPtrs.size === 2) {
-      const [a, b] = [...ringPtrs.values()];
-      ringPinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), k: ringView.k };
-    }
-  });
-  rc.addEventListener("pointermove", (e) => {
-    const was = ringPtrs.get(e.pointerId); if (!was) return;
-    const now = { x: e.offsetX, y: e.offsetY };
-    ringPtrs.set(e.pointerId, now);
-    if (ringPtrs.size === 2 && ringPinch) {
-      const [a, b] = [...ringPtrs.values()];
-      ringView.k = Math.max(.6, Math.min(10, ringPinch.k * Math.hypot(a.x - b.x, a.y - b.y) / ringPinch.dist));
-    } else if (ringPtrs.size === 1) {
-      ringView.yaw -= (now.x - was.x) * .008;
-      ringView.pitch = Math.max(.15, Math.min(1.2, ringView.pitch + (now.y - was.y) * .004));
-    }
-  });
-  const ringUp = (e) => {
-    if (ringTap && ringPtrs.size === 1 && performance.now() - ringTap.at < 350
-        && Math.hypot(e.offsetX - ringTap.x, e.offsetY - ringTap.y) < 6) pickRing(e.offsetX, e.offsetY);
-    ringPtrs.delete(e.pointerId);
-    if (ringPtrs.size < 2) ringPinch = null;
-    if (!ringPtrs.size) ringHeld = performance.now() + 3000;   // let go: it starts turning again after a moment
-    ringTap = null;
-  };
-  rc.addEventListener("pointerup", ringUp);
-  rc.addEventListener("pointercancel", ringUp);
-  rc.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    ringView.k = Math.max(.6, Math.min(10, ringView.k * Math.exp(-e.deltaY / 400)));
-  }, { passive: false });
-  $("#ringEnter").addEventListener("click", () => showPage("today"));
-  document.querySelectorAll("body > h1 img, body > h1 > span:not(.theme)").forEach((x) => x.addEventListener("click", () => showPage("rings")));
-  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.pitch = .4; ringT0 = performance.now(); });
-
-  // a page can be opened by name from the address (…/#save); otherwise home is the rings
-  let startPage = location.hash.slice(1) || "rings";
+  // a page can be opened by name from the address (…/#save), else the last one she looked at
+  let startPage = location.hash.slice(1);
+  if (!startPage) try { startPage = localStorage.getItem("sc-page") || "today"; } catch { startPage = "today"; }
   showPage(startPage);
 </script>
 </body>
