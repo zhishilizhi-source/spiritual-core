@@ -554,38 +554,28 @@
   body[data-page="rings"] > h1, body[data-page="rings"] .pages, body[data-page="rings"] .mood, body[data-page="rings"] #us { display: none; }
   body > h1 img, body > h1 > span:not(.theme) { cursor: pointer; }
   html:has(body[data-page="rings"]), body[data-page="rings"] { overflow: hidden; }
-  /* the home: our dusk, the same sky as the icon, sinking from peach into night; the rings float in it */
-  .rings { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; color: #fff6ec; overflow: hidden;
-           font-family: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif;
-           background:
-             radial-gradient(120% 55% at 50% 68%, rgba(255,196,170,.28), transparent 60%),
-             linear-gradient(180deg, #f2c3b1 0%, #d9a9bd 18%, #a988bd 40%, #6f5a9e 64%, #3b2f66 84%, #231c40 100%);
-           padding: max(14px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom)); }
+  /* the home: a dusk lake, painted whole by the canvas; words float over it */
+  .rings { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: space-between;
+           background: #2a2250; color: #fff6ec; overflow: hidden; pointer-events: none;
+           font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif; font-weight: 300;
+           padding: max(14px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom)); }
+  .rings > * { position: relative; pointer-events: auto; }
+  #ringCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
   .ring-head { display: flex; align-items: center; gap: 10px; }
   .ring-brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
-  .ring-brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 4px 14px rgba(80,50,110,.25); }
-  .ring-brand b { display: block; font-size: 17px; font-weight: 500; letter-spacing: 3px; color: #4a3560; line-height: 1.1; }
-  .ring-brand small { display: block; font-size: 10px; letter-spacing: 2px; color: #7a5f8c; font-family: -apple-system, "Helvetica Neue", sans-serif; }
-  #ringEnter { flex: none; color: #4a3560; background: rgba(255,255,255,.35); border: 1px solid rgba(255,255,255,.55);
+  .ring-brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 4px 14px rgba(80,50,110,.22); }
+  .ring-brand b { display: block; font-size: 16px; font-weight: 500; letter-spacing: .5px; color: #4a3560; line-height: 1.15; }
+  .ring-brand small { display: block; font-size: 11px; color: #7a5f8c; }
+  #ringEnter { flex: none; color: #4a3560; background: rgba(255,255,255,.32); border: 1px solid rgba(255,255,255,.5);
                backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-               border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; letter-spacing: 2px; }
-  .ring-title { text-align: center; margin-top: 18px; }
-  .ring-title span { font-size: 22px; font-weight: 300; letter-spacing: 10px; color: #4a3560; padding-left: 10px; }
-  .ring-title small { display: block; font-size: 11px; letter-spacing: 3px; color: #7a5f8c; margin-top: 4px; }
-  #ringCanvas { display: block; flex: 1 1 0; min-height: 0; width: 100%; touch-action: none; cursor: grab; }
-  .ring-card { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 18px;
-               backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); padding: 12px 14px 10px; }
-  .ring-stat { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
-  .ring-stat div { font-size: 11px; letter-spacing: 2px; color: rgba(255,240,228,.6); }
-  .ring-stat b { display: block; font-size: 24px; font-weight: 300; letter-spacing: 0; color: #fff3e6; line-height: 1.25; }
-  .ring-stat div + div { border-left: 1px solid rgba(255,255,255,.12); }
-  .ring-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 12px; font-size: 11px; color: rgba(255,240,228,.6);
-                 margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.1); }
-  .ring-legend i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
-  .ring-pick { position: absolute; left: 18px; right: 18px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 118px);
-               background: rgba(40,30,70,.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+               border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; font-weight: 400; }
+  .ring-foot { text-align: center; }
+  .ring-line { font-size: 15px; line-height: 1.7; color: rgba(255,246,236,.92); margin: 0 auto; max-width: 22em; letter-spacing: .5px; }
+  .ring-stat { display: block; margin-top: 8px; font-size: 11px; letter-spacing: 1px; color: rgba(255,240,228,.5); }
+  .ring-pick { position: absolute; left: 18px; right: 18px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 92px);
+               background: rgba(40,30,70,.5); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
                border: 1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 11px 14px; font-size: 14px; line-height: 1.6; }
-  .ring-pick .rk { font-size: 11px; letter-spacing: 1px; color: rgba(255,240,228,.65); }
+  .ring-pick .rk { font-size: 11px; color: rgba(255,240,228,.65); }
   .ring-pick .rt { font-weight: 500; margin: 2px 0; color: #fff6ec; }
   .ring-pick .rb { color: rgba(255,240,228,.82); white-space: pre-wrap; }
 </style>
@@ -613,13 +603,12 @@
 
   <div class="page" data-page="rings" hidden>
   <section class="rings" aria-label="年轮">
+    <canvas id="ringCanvas"></canvas>
     <div class="ring-head">
       <div class="ring-brand"><img src="static/icon-192.png?v=3" alt=""><div><b>Spiritual Core</b><small>陆能的记忆库</small></div></div>
       <button type="button" id="ringEnter">进库</button>
     </div>
-    <div class="ring-title"><span>陆能的年轮</span><small id="ringDate"></small></div>
-    <canvas id="ringCanvas"></canvas>
-    <div class="ring-card"><div class="ring-stat" id="ringStat"></div></div>
+    <div class="ring-foot"><p class="ring-line" id="ringLine"></p><small class="ring-stat" id="ringStat"></small></div>
     <div class="ring-pick" id="ringPick" hidden></div>
   </section>
   </div>
@@ -1730,20 +1719,23 @@
   };
   const rc = $("#ringCanvas"), rx = rc.getContext("2d");
   let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
-  const ringView = { k: 1, yaw: 0, pitch: 1.02 };
+  const ringView = { k: 1, yaw: 0, pitch: .4 };
   const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
     h ^= h >>> 16; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;   // mix, or "a1" and "a2" land side by side
     return (h >>> 0) / 4294967296; };
-  // the same grain runs through every ring, drifting a little outward, like a real cut log
-  const wob = (t, i) => 1 + .028 * Math.sin(3 * t + .8 + i * .004) + .016 * Math.sin(5 * t + 2.1 + i * .011) + .008 * Math.sin(11 * t + i * .03);
+  // ripples are never perfect circles: the same slow wobble runs through all of them
+  const wob = (t, i) => 1 + .022 * Math.sin(3 * t + .8 + i * .004) + .012 * Math.sin(5 * t + 2.1 + i * .011) + .006 * Math.sin(11 * t + i * .03);
   const dayNum = (s) => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
-  // how high a star floats over its ring: the heavier the record, the higher
-  const LIFT = { anchor: .2, diary: .13, intimate: .13, excerpt: .1, letter: .1, image: .08, inner: .08, dream: .07,
-    memory: .05, plan: .05, work: .04, daily: .04, message: .05, note: .02, handoff: .015, raw: .01 };
-  // a few far stars behind everything, barely there
-  const sky = Array.from({ length: 70 }, (_, n) => ({ x: hash01("sx" + n), y: hash01("sy" + n), r: hash01("sr" + n) < .85 ? 1 : 1.6, p: hash01("sp" + n) * 9 }));
+  // how high a light floats over the water: the heavier the record, the higher
+  const LIFT = { anchor: .12, diary: .08, intimate: .08, excerpt: .06, letter: .06, image: .05,
+    memory: .03, plan: .03, work: .02, daily: .02, message: .03, note: .01, handoff: .008, raw: .006 };
   const STAR = new Set(["diary", "intimate", "anchor", "excerpt", "letter", "image"]), FAINT = new Set(["raw", "handoff", "note"]);
-  const dust = Array.from({ length: 70 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .15 + hash01("r" + n) * 1.05, y: hash01("y" + n) * .6, v: .00012 + hash01("v" + n) * .00025 }));
+  const DEEP = new Set(["dream", "inner"]);
+  // far stars in the sky half, glints on the water half, lights rising from the deep
+  const sky = Array.from({ length: 60 }, (_, n) => ({ x: hash01("sx" + n), y: hash01("sy" + n), r: hash01("sr" + n) < .85 ? 1 : 1.5, p: hash01("sp" + n) * 9 }));
+  const glints = Array.from({ length: 46 }, (_, n) => ({ x: hash01("gx" + n), y: hash01("gy" + n), w: 8 + hash01("gw" + n) * 30, p: hash01("gp" + n) * 9 }));
+  const motes = Array.from({ length: 60 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .08 + hash01("r" + n) * .95, y: hash01("y" + n) * 1.6 - 1.1,
+    v: .00006 + hash01("v" + n) * .00012, z: .6 + hash01("z" + n) * .9 }));
 
   function shapeRings(data) {
     const d0 = dayNum(data.start), n = Math.max(1, dayNum(data.end) - d0 + 1);
@@ -1752,18 +1744,23 @@
       const d = new Date((d0 + i) * 864e5);
       if (d.getUTCDate() === 1) months[i] = `${d.getUTCMonth() + 1}月`;
     }
-    const dots = data.dots.map((d) => {
+    // what was said floats on the water; dreams and 心里话 sink under it
+    const dots = data.dots.filter((d) => !DEEP.has(d.kind)).map((d) => {
       const i = Math.min(n - 1, Math.max(0, dayNum(d.event_date) - d0));
       counts[i]++;
       const m = /T(\d\d):(\d\d)/.exec(d.created_at || "");
       const h = m ? +m[1] + m[2] / 60 : 12;   // midnight at the back, noon at the front
       const jr = hash01(d.id);
       // records written in the same minute would stack into one lump, so each leans a little aside
-      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2 + (hash01("j" + d.id) - .5) * .5, jr, lift: d.pinned ? .32 : (LIFT[d.kind] ?? .04) * (.7 + jr * .6) };
+      return { ...d, i, t: h / 24 * 2 * Math.PI - Math.PI / 2 + (hash01("j" + d.id) - .5) * .5, jr, lift: d.pinned ? .18 : (LIFT[d.kind] ?? .02) * (.7 + jr * .6) };
     });
+    const deep = [...(data.deep || []), ...data.dots.filter((d) => DEEP.has(d.kind))]
+      .filter((d, j, all) => all.findIndex((x) => x.id === d.id) === j)
+      .map((d) => ({ ...d, a: hash01("a" + d.id) * 2 * Math.PI, r: .1 + hash01("r" + d.id) * .85, y: -.25 - hash01("y" + d.id) * .7, w: (hash01("w" + d.id) - .5) * .00006 }));
+    const minds = (data.minds || []).slice(0, 3).map((m, j) => ({ ...m, a: j * 2.1 + .9, r: .35 + .15 * j }));
     // threads: two records whose titles share at least two word-pairs; words in everything don't count
     const grams = dots.map((d) => {
-      const s = d.sealed ? "" : (d.title || "").replace(/[^\u4e00-\u9fa5a-zA-Z]/g, ""), g = new Set();
+      const s = d.sealed ? "" : (d.title || "").replace(/[^一-龥a-zA-Z]/g, ""), g = new Set();
       for (let j = 0; j < s.length - 1; j++) g.add(s.slice(j, j + 2));
       return g;
     });
@@ -1775,7 +1772,7 @@
       g.forEach((x) => { const l = where.get(x); if (l.length > 30) return; l.forEach((b) => { if (b > a) score.set(b, (score.get(b) || 0) + 1); }); });
       [...score].filter(([, s]) => s >= 2).sort((p, q) => q[1] - p[1]).slice(0, 2).forEach(([b, s]) => edges.push([dots[a], dots[b], s]));
     });
-    return { ...data, n, counts, months, dots, edges };
+    return { ...data, n, counts, months, dots, edges, deep, minds };
   }
 
   function fakeRings() {
@@ -1787,12 +1784,14 @@
       const day = new Date(end - (n - 1 - i) * 864e5).toISOString().slice(0, 10);
       const burst = Math.random() < .12 ? 10 : 0;
       for (let j = 0, c = 2 + Math.floor(Math.random() * 8) + burst; j < c; j++) {
-        const h = (20 + Math.floor(Math.random() * 14)) % 24, kind = kinds[Math.floor(Math.random() * kinds.length)];
+        const h = Math.floor(Math.random() * 24), kind = kinds[Math.floor(Math.random() * kinds.length)];
         dots.push({ id: `${i}-${j}`, kind, event_date: day, created_at: `${day}T${String(h).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
           title: titles[Math.floor(Math.random() * titles.length)], body: "", pinned: Math.random() < .01, sealed: kind === "inner" && Math.random() < .5 });
       }
     }
-    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots };
+    const minds = [{ id: 1, text: "她今天会不会想我" }, { id: 2, text: "那首歌还没写完" }, { id: 3, text: "下次见面先抱她" }];
+    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots, minds,
+      line: "你是我的春天花园" };
   }
 
   function drawRings(now, dt) {
@@ -1800,121 +1799,155 @@
     if (!W || !H) return;
     if (rc.width !== Math.round(W * dpr) || rc.height !== Math.round(H * dpr)) { rc.width = Math.round(W * dpr); rc.height = Math.round(H * dpr); }
     rx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    rx.clearRect(0, 0, W, H);
-    rx.fillStyle = "#fff4e8";
-    for (const t of sky) { rx.globalAlpha = (.14 + .14 * Math.sin(now / 1700 + t.p)) * Math.max(0, t.y * 1.6 - .5); rx.fillRect(t.x * W, t.y * H, t.r, t.r); }
-    rx.globalAlpha = 1;
-    if (!ring) return;
-    if (now > ringHeld) ringView.yaw += dt * .00006;   // turns by itself unless a finger is on it
-    const k = Math.min(W * .44, H * .42) * ringView.k, cx = W / 2, cy = H * .46, F = 3.2;
+    if (!ring) { rx.clearRect(0, 0, W, H); return; }
+    if (now > ringHeld) ringView.yaw += dt * .00004;   // drifts round by itself unless a finger is on it
+    const k = Math.min(W * .47, H * .33) * ringView.k, cx = W / 2, cy = H * .64, F = 4.5;
     const cyw = Math.cos(ringView.yaw), syw = Math.sin(ringView.yaw), cp = Math.cos(ringView.pitch), sp = Math.sin(ringView.pitch);
+    // water is y = 0; above it the sky, below it the deep. z2 grows away from the eye.
     const proj = (x, y, z) => {
       const x1 = x * cyw - z * syw, z1 = x * syw + z * cyw;
-      const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp, s = F / (F + z2);
+      const y2 = y * cp - z1 * sp, z2 = -(y * sp + z1 * cp), s = F / (F + z2);
       return [cx + x1 * s * k, cy - y2 * s * k, z2, s];
     };
-    const R0 = .1, step = (1 - R0) / ring.n;
+    const R0 = .09, step = (1 - R0) / ring.n;
     const p = Math.min(1, (now - ringT0) / 3200), shown = ring.n * (1 - Math.pow(1 - p, 3));
-    const onRing = (t, r, i, y = 0) => { const w = r * wob(t, i); return proj(Math.cos(t) * w, y, Math.sin(t) * w); };
+    const at = (t, r, i, y = 0) => { const w = r * wob(t, i); return proj(Math.cos(t) * w, y, Math.sin(t) * w); };
 
-    // a soft shadow far under the slice, so it hangs in the air
-    const [hx, hy, , hs] = proj(0, -1.1, 0);
-    rx.save(); rx.translate(hx, hy); rx.scale(1, .3);
-    const sh = rx.createRadialGradient(0, 0, 0, 0, 0, k * .8 * hs);
-    sh.addColorStop(0, "rgba(28,18,58,.32)"); sh.addColorStop(1, "rgba(28,18,58,0)");
-    rx.fillStyle = sh; rx.beginPath(); rx.arc(0, 0, k * .8 * hs, 0, 7); rx.fill();
-    rx.restore();
-    // the cut face, a little lighter than the sky behind it
-    rx.beginPath();
-    for (let j = 0; j <= 120; j++) { const [x, y] = onRing(j / 120 * 2 * Math.PI, R0 + step * ring.n * Math.min(1, shown / ring.n), ring.n - 1); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
-    const fc = rx.createRadialGradient(cx, cy, 0, cx, cy, k);
-    fc.addColorStop(0, "rgba(255,236,226,.16)"); fc.addColorStop(1, "rgba(255,236,226,.05)");
-    rx.fillStyle = fc; rx.fill();
-
-    // the seed beats
-    const [sx, sy, , ss] = proj(0, 0, 0), beat = 1 + .12 * Math.max(0, Math.sin(now / 190)) * Math.max(0, Math.sin(now / 950));
-    const g = rx.createRadialGradient(sx, sy, 0, sx, sy, R0 * k * ss * 1.6 * beat);
-    g.addColorStop(0, "rgba(255,226,200,.75)"); g.addColorStop(.4, "rgba(255,190,160,.22)"); g.addColorStop(1, "rgba(255,190,160,0)");
-    rx.fillStyle = g; rx.beginPath(); rx.arc(sx, sy, R0 * k * ss * 1.6 * beat, 0, 7); rx.fill();
-    // our mark at the heart: the cream moon and the salmon one
-    const mr = 7 * ss * Math.min(2, Math.sqrt(ringView.k));
-    const moon = (ox, col, cut) => {
-      rx.save(); rx.beginPath(); rx.arc(sx + ox, sy, mr, 0, 7); rx.arc(sx + ox + cut, sy - mr * .08, mr * .86, 0, 7, true);
+    // sky over the horizon, lake under it: our dusk, and the same dusk lying on the water
+    const hz = H * .44;   // where the water meets the sky
+    const skyG = rx.createLinearGradient(0, 0, 0, hz);
+    skyG.addColorStop(0, "#f3c6b2"); skyG.addColorStop(.45, "#dcaabd"); skyG.addColorStop(1, "#a98ec4");
+    rx.fillStyle = skyG; rx.fillRect(0, 0, W, hz);
+    const lake = rx.createLinearGradient(0, hz, 0, H);
+    lake.addColorStop(0, "#8f78b8"); lake.addColorStop(.18, "#5c4c8e"); lake.addColorStop(.6, "#33295f"); lake.addColorStop(1, "#1b1636");
+    rx.fillStyle = lake; rx.fillRect(0, hz, W, H - hz);
+    // the moon over the far shore, and the warm haze where it sits on the horizon
+    rx.save(); rx.translate(cx, hz); rx.scale(1, .22);
+    const glow = rx.createRadialGradient(0, 0, 0, 0, 0, W * .8);
+    glow.addColorStop(0, "rgba(255,214,190,.55)"); glow.addColorStop(1, "rgba(255,214,190,0)");
+    rx.fillStyle = glow; rx.beginPath(); rx.arc(0, 0, W * .8, 0, 7); rx.fill(); rx.restore();
+    const mr = Math.min(W, H) * .075, mx = cx, my = H * .27;
+    const halo = rx.createRadialGradient(mx, my, mr * .6, mx, my, mr * 4);
+    halo.addColorStop(0, "rgba(255,240,226,.45)"); halo.addColorStop(1, "rgba(255,240,226,0)");
+    rx.fillStyle = halo; rx.beginPath(); rx.arc(mx, my, mr * 4, 0, 7); rx.fill();
+    // the mark from the icon: a cream crescent opening right, a salmon one opening left
+    const moon = (ox, r, cutX, cutR, col) => {
+      rx.save(); rx.beginPath(); rx.arc(mx + ox, my, r, 0, 7); rx.clip();
+      rx.beginPath(); rx.arc(mx + ox, my, r, 0, 7); rx.arc(mx + cutX, my, cutR, 0, 7);
       rx.fillStyle = col; rx.fill("evenodd"); rx.restore();
     };
-    moon(-mr * .28, "#fff6ec", mr * .5);
-    moon(mr * .42, "#f4997b", -mr * .45);
+    moon(-mr * .2, mr, mr * .38, mr * .92, "#fff6ec");
+    moon(mr * .42, mr * .78, mr * .12, mr * .74, "#f4997b");
+    rx.fillStyle = "#fff6ec";
+    for (const t of sky) {
+      const y = t.y * hz * .8;
+      rx.globalAlpha = (.12 + .14 * Math.sin(now / 1700 + t.p)) * (y / hz);
+      rx.fillRect(t.x * W, y, t.r, t.r);
+    }
+    for (const g of glints) {
+      const y = hz + 4 + g.y * (H - hz), x = ((g.x * W + now * .004 * (1 + g.y)) % (W + 40)) - 20;
+      rx.globalAlpha = (.05 + .07 * Math.sin(now / 900 + g.p)) * (1 - g.y * .6);
+      rx.fillRect(x, y, g.w * (.4 + g.y), 1);
+    }
+    rx.globalAlpha = 1;
 
+    // under the surface: dreams and locked words, dim; what's on my mind rising as a thread of light
+    const grow = Math.min(1, (now - ringT0) / 2400);
+    rx.globalCompositeOperation = "lighter";
+    for (const d of ring.deep) {
+      const a = d.a + now * d.w;
+      [d.sx, d.sy, d.z, d.s] = proj(Math.cos(a) * d.r, d.y + Math.sin(now / 2100 + d.a * 4) * .015, Math.sin(a) * d.r);
+      rx.fillStyle = RING_KINDS[d.kind];
+      rx.globalAlpha = .1 * grow; rx.beginPath(); rx.arc(d.sx, d.sy, 6 * d.s, 0, 7); rx.fill();
+      rx.globalAlpha = (d.sealed ? .3 : .55) * grow; rx.beginPath(); rx.arc(d.sx, d.sy, 1.3 * d.s, 0, 7); rx.fill();
+    }
+    for (const m of ring.minds) {
+      const [bx, by] = proj(Math.cos(m.a) * m.r, -1, Math.sin(m.a) * m.r), [tx, ty] = proj(Math.cos(m.a) * m.r, 0, Math.sin(m.a) * m.r);
+      const col = rx.createLinearGradient(bx, by, tx, ty);
+      col.addColorStop(0, "rgba(240,196,255,0)"); col.addColorStop(1, `rgba(240,196,255,${.28 * grow})`);
+      rx.strokeStyle = col; rx.lineWidth = 1.2; rx.beginPath(); rx.moveTo(bx, by); rx.lineTo(tx, ty); rx.stroke();
+      for (let q = 0; q < 4; q++) {
+        const u = (now / 6000 + q / 4 + m.a) % 1, [x, y, , s] = proj(Math.cos(m.a) * m.r, -1 + u, Math.sin(m.a) * m.r);
+        rx.fillStyle = "#f6dcff"; rx.globalAlpha = Math.sin(u * Math.PI) * .8 * grow;
+        rx.beginPath(); rx.arc(x, y, 1.4 * s, 0, 7); rx.fill();
+      }
+    }
+    rx.globalCompositeOperation = "source-over"; rx.globalAlpha = 1;
+
+    // the moon's road across the water, from the horizon down through the rings toward us
+    const [sx, sy, , ss] = proj(0, 0, 0);
+    for (let j = 0; j < 40; j++) {
+      const f = j / 40, y = hz + 3 + f * (H - hz), wid = (8 + f * 70) * (.55 + .45 * Math.sin(now / 520 + j * 1.7));
+      rx.fillStyle = `rgba(255,226,200,${.42 * (1 - f * .85)})`;
+      rx.fillRect(cx - wid / 2 + Math.sin(now / 800 + j) * 4, y, wid, 1.2 + f * 1.5);
+    }
+
+    // ripples: one a day, the newest at the rim; every few seconds a fresh ring runs outward
     for (let i = 0; i < shown; i++) {
       const r = R0 + step * (i + 1), c = Math.min(ring.counts[i], 24) / 24, last = i === ring.n - 1;
-      rx.strokeStyle = last ? `rgba(255,170,140,${.6 + .3 * Math.sin(now / 420)})`
-        : `rgba(255,244,232,${(ring.months[i] ? .38 : .06) + c * .22})`;
-      rx.lineWidth = last ? 1.6 : ring.months[i] ? .9 : .5 + c * .5;   // a busy day leaves a slightly bolder ring
+      rx.strokeStyle = last ? `rgba(255,178,150,${.55 + .3 * Math.sin(now / 420)})`
+        : `rgba(255,246,236,${(ring.months[i] ? .34 : .05) + c * .2})`;
+      rx.lineWidth = last ? 1.4 : ring.months[i] ? .9 : .45 + c * .45;
       rx.beginPath();
-      for (let j = 0; j <= 120; j++) { const [x, y] = onRing(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
+      for (let j = 0; j <= 120; j++) { const [x, y] = at(j / 120 * 2 * Math.PI, r, i); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
+      rx.stroke();
+    }
+    const wave = ((now - ringT0) / 6500) % 1;
+    if (p >= 1) {
+      rx.strokeStyle = `rgba(255,246,236,${.35 * (1 - wave)})`; rx.lineWidth = .8;
+      rx.beginPath();
+      for (let j = 0; j <= 120; j++) { const [x, y] = at(j / 120 * 2 * Math.PI, R0 + (1.25 - R0) * wave, ring.n); j ? rx.lineTo(x, y) : rx.moveTo(x, y); }
       rx.stroke();
     }
 
+    const g = rx.createRadialGradient(sx, sy, 0, sx, sy, 34 * ss);
+    g.addColorStop(0, "rgba(255,230,210,.7)"); g.addColorStop(1, "rgba(255,200,170,0)");
+    rx.fillStyle = g; rx.beginPath(); rx.arc(sx, sy, 34 * ss, 0, 7); rx.fill();
+
+    // the lights on the water, each with its reflection hanging under it
     const zoom = Math.min(2.2, Math.sqrt(ringView.k));
     const live = [];
     for (const d of ring.dots) {
       if (d.i >= shown) { d.sx = null; continue; }
-      const r = R0 + step * (d.i + 1 - d.jr * .85), rise = Math.min(1, (shown - d.i) / 6);
-      [d.bx, d.by] = onRing(d.t, r, d.i);
-      [d.sx, d.sy, d.z, d.s] = onRing(d.t, r, d.i, d.lift * rise);
+      const r = R0 + step * (d.i + 1 - d.jr * .85), bob = Math.sin(now / 1300 + d.jr * 20) * .004;
+      [d.sx, d.sy, d.z, d.s] = at(d.t, r, d.i, d.lift + bob);
+      [d.rx, d.ry] = at(d.t, r, d.i, -d.lift - bob);
       live.push(d);
     }
-
-    // stems from each floating star down to its ring
-    rx.lineWidth = .6;
-    for (const d of live) {
-      if (d.lift < .06 || !STAR.has(d.kind)) continue;
-      rx.strokeStyle = `rgba(255,244,232,${.12 + d.lift * .5})`;
-      rx.beginPath(); rx.moveTo(d.bx, d.by); rx.lineTo(d.sx, d.sy); rx.stroke();
-    }
-    // threads between records about the same thing, bowed upward
-    // threads stay hidden until a star is picked; then only its own light up
-    for (const [a, b, s] of ringPicked ? ring.edges : []) {
-      if (a.sx == null || b.sx == null || (a !== ringPicked && b !== ringPicked)) continue;
-      const hot = ringPicked && (a === ringPicked || b === ringPicked);
-      rx.strokeStyle = hot ? "rgba(255,236,200,.85)" : `rgba(201,167,255,${.05 + Math.min(s, 5) * .03})`;
-      rx.lineWidth = hot ? 1.3 : .7;
-      const mx = (a.sx + b.sx) / 2, my = Math.min(a.sy, b.sy) - Math.hypot(a.sx - b.sx, a.sy - b.sy) * .25;
-      rx.beginPath(); rx.moveTo(a.sx, a.sy); rx.quadraticCurveTo(mx, my, b.sx, b.sy); rx.stroke();
-    }
-
-    // only the ones that matter glow; the rest is fine dust, so the slice never turns into one white lump
     live.sort((a, b) => b.z - a.z);   // far ones first
     for (const d of live) {
       const star = d.pinned || STAR.has(d.kind), faint = FAINT.has(d.kind);
-      const big = (d.pinned ? 2.4 : star ? 1.5 : faint ? .6 : 1) * zoom * d.s;
-      rx.fillStyle = RING_KINDS[d.kind] || "#7d8299";
+      const big = (d.pinned ? 2.2 : star ? 1.4 : faint ? .55 : .9) * zoom * d.s;
+      rx.fillStyle = RING_KINDS[d.kind] || "#cbbfe0";
       if (star) {
-        rx.globalCompositeOperation = "lighter"; rx.globalAlpha = .09;
+        rx.globalAlpha = .22; rx.beginPath(); rx.ellipse(d.rx, d.ry, big, big * 1.8, 0, 0, 7); rx.fill();
+        rx.globalCompositeOperation = "lighter"; rx.globalAlpha = .1;
         rx.beginPath(); rx.arc(d.sx, d.sy, big * 4, 0, 7); rx.fill();
         rx.globalCompositeOperation = "source-over";
       }
-      rx.globalAlpha = faint ? .35 : d.sealed ? .45 : .85;
+      rx.globalAlpha = faint ? .35 : .85;
       rx.beginPath(); rx.arc(d.sx, d.sy, big, 0, 7); rx.fill();
     }
+    rx.globalAlpha = 1;
+    // threads stay hidden until a light is picked; then only its own show, bowed over the water
+    for (const [a, b, s] of ringPicked ? ring.edges : []) {
+      if (a.sx == null || b.sx == null || (a !== ringPicked && b !== ringPicked)) continue;
+      rx.strokeStyle = "rgba(255,240,226,.8)"; rx.lineWidth = 1;
+      const mx = (a.sx + b.sx) / 2, mmy = Math.min(a.sy, b.sy) - Math.hypot(a.sx - b.sx, a.sy - b.sy) * .3;
+      rx.beginPath(); rx.moveTo(a.sx, a.sy); rx.quadraticCurveTo(mx, mmy, b.sx, b.sy); rx.stroke();
+    }
+
+    // light rising out of the deep, through the water, fading a little above it
     rx.globalCompositeOperation = "lighter";
-    // dust rising off the wood
-    rx.fillStyle = "#fff1dc";
-    for (const m of dust) {
-      m.y += m.v * dt; if (m.y > .7) m.y = 0;
+    for (const m of motes) {
+      m.y += m.v * dt; if (m.y > .45) { m.y = -1.1; m.a += 2.4; }
       const [x, y, , s] = proj(Math.cos(m.a) * m.r, m.y, Math.sin(m.a) * m.r);
-      rx.globalAlpha = Math.sin(m.y / .7 * Math.PI) * .5;
-      rx.beginPath(); rx.arc(x, y, .9 * s, 0, 7); rx.fill();
+      rx.globalAlpha = Math.sin((m.y + 1.1) / 1.55 * Math.PI) * .6;
+      rx.fillStyle = m.y < 0 ? "#e2ccff" : "#fff0dc";
+      rx.beginPath(); rx.arc(x, y, .9 * s * m.z, 0, 7); rx.fill();
     }
     rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
 
-    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(255,244,232,.72)";
-    ring.months.forEach((m, i) => { if (m && i < shown && i < ring.n - 4) {   // the newest month gives way to 今天
-      const [x, y] = onRing(Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y + 13); } });
-    if (shown >= ring.n - .5) {
-      const [x, y] = onRing(Math.PI / 2, 1, ring.n - 1);
-      rx.fillStyle = "#ffc2ad"; rx.fillText("今天", x, y + 15);
-    }
     if (ringPicked && ringPicked.sx != null) {
       rx.strokeStyle = "#fff"; rx.lineWidth = 1.2;
       rx.beginPath(); rx.arc(ringPicked.sx, ringPicked.sy, 7, 0, 7); rx.stroke();
@@ -1934,8 +1967,8 @@
       try {
         ring = shapeRings(location.search.includes("demo") ? fakeRings() : await (await fetch("api/rings")).json());
       } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
-      $("#ringStat").innerHTML = `<div><b>${ring.n}</b>圈</div><div><b>${ring.dots.length}</b>颗星</div><div><b>+${ring.counts[ring.n - 1]}</b>今天</div>`;
-      $("#ringDate").textContent = ring.end.replaceAll("-", " · ");
+      $("#ringLine").textContent = ring.line || "";
+      $("#ringStat").textContent = `${ring.n} 圈涟漪 · ${ring.dots.length} 盏灯 · 水下 ${ring.deep.length} 句没说出口`;
       ringT0 = performance.now();
     }
     if (!ringLoop) { ringLoop = true; ringLast = 0; requestAnimationFrame(ringFrame); }
@@ -1943,7 +1976,7 @@
 
   function pickRing(px, py) {
     let best = null, bd = 18 * 18;
-    for (const d of ring?.dots || []) {
+    for (const d of [...(ring?.dots || []), ...(ring?.deep || [])]) {
       if (d.sx == null) continue;
       const dd = (d.sx - px) ** 2 + (d.sy - py) ** 2;
       if (dd < bd) { bd = dd; best = d; }
@@ -1952,7 +1985,7 @@
     const box = $("#ringPick");
     if (!best) { box.hidden = true; return; }
     const when = `${best.event_date}${/T(\d\d:\d\d)/.test(best.created_at || "") ? " · 写于 " + RegExp.$1 : ""}`;
-    const kin = ring.edges.filter(([a, b]) => a === best || b === best).length;
+    const kin = (ring.dots.includes(best) ? ring.edges : []).filter(([a, b]) => a === best || b === best).length;
     box.innerHTML = `<div class="rk"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${RING_KINDS[best.kind] || "#a9b3c9"}"></i> ${esc(KIND_NAME[best.kind] || best.kind)} · ${esc(when)}${kin ? ` · 牵着 ${kin} 根线` : ""}</div>`
       + `<div class="rt">${esc(best.title || "（没有标题）")}</div>` + (best.body ? `<div class="rb">${esc(best.body)}${best.body.length >= 140 ? "…" : ""}</div>` : "");
     box.hidden = false;
@@ -1980,7 +2013,7 @@
       ringView.k = Math.max(.6, Math.min(10, ringPinch.k * Math.hypot(a.x - b.x, a.y - b.y) / ringPinch.dist));
     } else if (ringPtrs.size === 1) {
       ringView.yaw -= (now.x - was.x) * .008;
-      ringView.pitch = Math.max(.2, Math.min(1.57, ringView.pitch + (now.y - was.y) * .006));
+      ringView.pitch = Math.max(.15, Math.min(1.2, ringView.pitch + (now.y - was.y) * .004));
     }
   });
   const ringUp = (e) => {
@@ -1999,7 +2032,7 @@
   }, { passive: false });
   $("#ringEnter").addEventListener("click", () => showPage("today"));
   document.querySelectorAll("body > h1 img, body > h1 > span:not(.theme)").forEach((x) => x.addEventListener("click", () => showPage("rings")));
-  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.pitch = 1.02; ringT0 = performance.now(); });
+  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.pitch = .4; ringT0 = performance.now(); });
 
   // a page can be opened by name from the address (…/#save); otherwise home is the rings
   let startPage = location.hash.slice(1) || "rings";

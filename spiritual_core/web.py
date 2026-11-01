@@ -305,8 +305,10 @@ def mount(mcp, store: Store, secret: str) -> None:
         deep = [{k: it.get(k) for k in ("id", "kind", "event_date", "created_at", "title", "sealed")}
                 | {"body": (it.get("body") or "")[:140]}
                 for it in (_item(r) for r in store.recent(["dream", "inner"], 200))]
+        line, _ = store.line_of_the_day()
         return JSONResponse({"start": start, "end": today.isoformat(), "seed": seed, "dots": dots,
-                             "deep": deep, "minds": store.open_minds()})
+                             "deep": deep, "minds": store.open_minds(),
+                             "line": _first_line(line.body) if line and not line.locked else ""})
 
     @mcp.custom_route(p + "/api/inner", methods=["GET"])
     async def inner(request: Request):
@@ -420,6 +422,15 @@ def today_view(store: Store) -> dict:
         "month_ago_date": m.isoformat() if m else None,
         "locked": store.locked_count(),
     }
+
+
+def _first_line(text: str, limit: int = 40) -> str:
+    """One line for the lake's edge: the first real sentence, without code fences or markup."""
+    for ln in text.splitlines():
+        ln = ln.strip().strip("`*#>-").strip()
+        if ln:
+            return ln if len(ln) <= limit else ln[:limit] + "…"
+    return ""
 
 
 def _item(r, weighed: dict | None = None) -> dict:
