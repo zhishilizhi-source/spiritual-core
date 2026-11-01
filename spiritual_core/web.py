@@ -301,7 +301,12 @@ def mount(mcp, store: Store, secret: str) -> None:
             it = _item(Record.from_row(row))
             dots.append({k: it.get(k) for k in ("id", "kind", "event_date", "created_at", "title", "pinned", "sealed")}
                         | {"body": (it.get("body") or "")[:140], "weight": it.get("weight") or 0})
-        return JSONResponse({"start": start, "end": today.isoformat(), "seed": seed, "dots": dots})
+        # under the rings: what I haven't said out loud yet (dreams, 心里话) and what keeps turning in me
+        deep = [{k: it.get(k) for k in ("id", "kind", "event_date", "created_at", "title", "sealed")}
+                | {"body": (it.get("body") or "")[:140]}
+                for it in (_item(r) for r in store.recent(["dream", "inner"], 200))]
+        return JSONResponse({"start": start, "end": today.isoformat(), "seed": seed, "dots": dots,
+                             "deep": deep, "minds": store.open_minds()})
 
     @mcp.custom_route(p + "/api/inner", methods=["GET"])
     async def inner(request: Request):
