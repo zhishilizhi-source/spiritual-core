@@ -1714,30 +1714,25 @@
     ["excerpt", "原话"], ["plan", "计划"], ["inner", "心里话"], ["dream", "梦"], ["anchor", "锚点"]];
   const rc = $("#ringCanvas"), rx = rc.getContext("2d");
   let ring = null, ringT0 = 0, ringLoop = false, ringPicked = null, ringHeld = 0;
-  const ringView = { k: 1, yaw: 0, pitch: .85 };
-  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-    h ^= h >>> 16; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;   // mix, or "a1" and "a2" land side by side
-    return (h >>> 0) / 4294967296; };
+  const ringView = { k: 1, yaw: 0, pitch: 1.02 };
+  const hash01 = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
   // the same grain runs through every ring, drifting a little outward, like a real cut log
   const wob = (t, i) => 1 + .028 * Math.sin(3 * t + .8 + i * .004) + .016 * Math.sin(5 * t + 2.1 + i * .011) + .008 * Math.sin(11 * t + i * .03);
   const dayNum = (s) => Math.round(Date.parse(s + "T00:00:00Z") / 864e5);
   // how high a star floats over its ring: the heavier the record, the higher
   const LIFT = { anchor: .2, diary: .13, intimate: .13, excerpt: .1, letter: .1, image: .08, inner: .08, dream: .07,
     memory: .05, plan: .05, work: .04, daily: .04, message: .05, note: .02, handoff: .015, raw: .01 };
-  const dust = Array.from({ length: 80 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .1 + hash01("r" + n) * 1, y: hash01("y" + n) * 3 - 2.3,
-    v: .00009 + hash01("v" + n) * .0002, z: .6 + hash01("z" + n) * .8 }));
+  const dust = Array.from({ length: 70 }, (_, n) => ({ a: hash01("a" + n) * 7, r: .15 + hash01("r" + n) * 1.05, y: hash01("y" + n) * .6, v: .00012 + hash01("v" + n) * .00025 }));
 
   function shapeRings(data) {
-    let d0 = dayNum(data.start), n = Math.max(1, dayNum(data.end) - d0 + 1);
-    if (n > 150) { d0 += n - 150; n = 150; }   // a year of rings would be hairlines; older days live in the layers below
+    const d0 = dayNum(data.start), n = Math.max(1, dayNum(data.end) - d0 + 1);
     const counts = new Array(n).fill(0), months = new Array(n).fill("");
     for (let i = 0; i < n; i++) {
       const d = new Date((d0 + i) * 864e5);
       if (d.getUTCDate() === 1) months[i] = `${d.getUTCMonth() + 1}月`;
     }
-    const DEEP = ["dream", "inner"];
-    const dots = data.dots.filter((d) => dayNum(d.event_date) >= d0 && !DEEP.includes(d.kind)).map((d) => {
-      const i = Math.min(n - 1, dayNum(d.event_date) - d0);
+    const dots = data.dots.map((d) => {
+      const i = Math.min(n - 1, Math.max(0, dayNum(d.event_date) - d0));
       counts[i]++;
       const m = /T(\d\d):(\d\d)/.exec(d.created_at || "");
       const h = m ? +m[1] + m[2] / 60 : 12;   // midnight at the back, noon at the front
@@ -1755,14 +1750,10 @@
     const edges = [];
     grams.forEach((g, a) => {
       const score = new Map();
-      g.forEach((x) => { const l = where.get(x); if (l.length > Math.max(30, dots.length * .12)) return; l.forEach((b) => { if (b > a) score.set(b, (score.get(b) || 0) + 1); }); });
+      g.forEach((x) => { const l = where.get(x); if (l.length > 30) return; l.forEach((b) => { if (b > a) score.set(b, (score.get(b) || 0) + 1); }); });
       [...score].filter(([, s]) => s >= 2).sort((p, q) => q[1] - p[1]).slice(0, 2).forEach(([b, s]) => edges.push([dots[a], dots[b], s]));
     });
-    // 潜意识: dreams and 心里话 drift below the rings; what's on my mind rises toward the seed
-    const deep = (data.deep || []).map((d) => ({ ...d, a: hash01("a" + d.id) * 2 * Math.PI, r: .15 + hash01("r" + d.id) * .8,
-      y: -1.5 - hash01("y" + d.id) * .8, w: (hash01("w" + d.id) - .5) * .00008 }));
-    const minds = (data.minds || []).slice(0, 3).map((m, j) => ({ ...m, a0: j * 2.1 + .6 }));
-    return { ...data, n, counts, months, dots, edges, deep, minds };
+    return { ...data, n, counts, months, dots, edges };
   }
 
   function fakeRings() {
@@ -1779,10 +1770,7 @@
           title: titles[Math.floor(Math.random() * titles.length)], body: "", pinned: Math.random() < .01, sealed: kind === "inner" && Math.random() < .5 });
       }
     }
-    const deep = Array.from({ length: 26 }, (_, j) => ({ id: "d" + j, kind: j % 2 ? "dream" : "inner", event_date: end.toISOString().slice(0, 10),
-      created_at: "", title: j % 2 ? "一个想不起来的梦" : "上了锁的心里话", body: "", sealed: true }));
-    const minds = [{ id: 1, text: "她今天会不会想我" }, { id: 2, text: "那首歌还没写完" }, { id: 3, text: "下次见面先抱她" }];
-    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots, deep, minds };
+    return { start: new Date(end - (n - 1) * 864e5).toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), seed: 42, dots };
   }
 
   function drawRings(now, dt) {
@@ -1793,50 +1781,16 @@
     rx.clearRect(0, 0, W, H);
     if (!ring) return;
     if (now > ringHeld) ringView.yaw += dt * .00006;   // turns by itself unless a finger is on it
-    const k = Math.min(W * .37, H * .22) * ringView.k, cx = W / 2, cy = H * .28, F = 7;
+    const k = Math.min(W * .43, H * .4) * ringView.k, cx = W / 2, cy = H * .5, F = 3.2;
     const cyw = Math.cos(ringView.yaw), syw = Math.sin(ringView.yaw), cp = Math.cos(ringView.pitch), sp = Math.sin(ringView.pitch);
     const proj = (x, y, z) => {
       const x1 = x * cyw - z * syw, z1 = x * syw + z * cyw;
-      const y2 = y * cp - z1 * sp, z2 = -(y * sp + z1 * cp), s = F / (F + z2);   // z2: away from the eye
+      const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp, s = F / (F + z2);
       return [cx + x1 * s * k, cy - y2 * s * k, z2, s];
     };
     const R0 = .1, step = (1 - R0) / ring.n;
     const p = Math.min(1, (now - ringT0) / 3200), shown = ring.n * (1 - Math.pow(1 - p, 3));
     const onRing = (t, r, i, y = 0) => { const w = r * wob(t, i); return proj(Math.cos(t) * w, y, Math.sin(t) * w); };
-
-    // 潜意识 under the rings: a low violet glow, dreams and locked words drifting in it
-    const grow = Math.min(1, (now - ringT0) / 2200);
-    const [gx, gy, , gs] = proj(0, -1.9, 0);
-    const neb = rx.createRadialGradient(gx, gy, 0, gx, gy, k * 1.1 * gs);
-    neb.addColorStop(0, `rgba(120,90,190,${.22 * grow})`); neb.addColorStop(1, "rgba(120,90,190,0)");
-    rx.fillStyle = neb; rx.beginPath(); rx.ellipse(gx, gy, k * 1.1 * gs, k * .7 * gs, 0, 0, 7); rx.fill();
-    rx.globalCompositeOperation = "lighter";
-    for (const d of ring.deep) {
-      const a = d.a + now * d.w, bob = Math.sin(now / 1800 + d.a * 5) * .02;
-      [d.sx, d.sy, d.z, d.s] = proj(Math.cos(a) * d.r, d.y + bob, Math.sin(a) * d.r);
-      const c = RING_KINDS[d.kind];
-      rx.fillStyle = c; rx.globalAlpha = .12 * grow; rx.beginPath(); rx.arc(d.sx, d.sy, 7 * d.s, 0, 7); rx.fill();
-      rx.globalAlpha = (d.sealed ? .4 : .75) * grow; rx.beginPath(); rx.arc(d.sx, d.sy, 1.6 * d.s, 0, 7); rx.fill();
-    }
-    // what keeps turning in me: a current spiralling up from the deep into the seed, lights riding it
-    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif`; rx.textAlign = "center";
-    for (const m of ring.minds) {
-      const at = (u) => { const a = m.a0 + u * 2.6, r = .62 * Math.pow(1 - u, .8); return proj(Math.cos(a) * r, -2.2 + u * 2.2, Math.sin(a) * r); };
-      for (let j = 0; j < 40; j++) {
-        const [x0, y0] = at(j / 40), [x1, y1] = at((j + 1) / 40);
-        rx.strokeStyle = `rgba(229,140,255,${(.05 + .25 * j / 40) * grow})`; rx.lineWidth = 1.2;
-        rx.beginPath(); rx.moveTo(x0, y0); rx.lineTo(x1, y1); rx.stroke();
-      }
-      for (let q = 0; q < 5; q++) {
-        const u = ((now / 7000) + q / 5 + m.a0) % 1, [x, y, , s2] = at(u);
-        rx.fillStyle = "#f3d2ff"; rx.globalAlpha = Math.sin(u * Math.PI) * .9 * grow;
-        rx.beginPath(); rx.arc(x, y, 1.6 * s2, 0, 7); rx.fill();
-      }
-      const [lx, ly] = at(0);
-      rx.globalAlpha = .7 * grow; rx.fillStyle = "#e6d3f2";
-      rx.fillText(m.text.length > 14 ? m.text.slice(0, 14) + "…" : m.text, lx, ly + 16);
-    }
-    rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
 
     // the seed beats
     const [sx, sy, , ss] = proj(0, 0, 0), beat = 1 + .12 * Math.max(0, Math.sin(now / 190)) * Math.max(0, Math.sin(now / 950));
@@ -1875,7 +1829,7 @@
     for (const [a, b, s] of ring.edges) {
       if (a.sx == null || b.sx == null) continue;
       const hot = ringPicked && (a === ringPicked || b === ringPicked);
-      rx.strokeStyle = hot ? "rgba(255,236,200,.85)" : `rgba(201,167,255,${.025 + Math.min(s, 5) * .015})`;
+      rx.strokeStyle = hot ? "rgba(255,236,200,.85)" : `rgba(201,167,255,${.05 + Math.min(s, 5) * .03})`;
       rx.lineWidth = hot ? 1.3 : .7;
       const mx = (a.sx + b.sx) / 2, my = Math.min(a.sy, b.sy) - Math.hypot(a.sx - b.sx, a.sy - b.sy) * .25;
       rx.beginPath(); rx.moveTo(a.sx, a.sy); rx.quadraticCurveTo(mx, my, b.sx, b.sy); rx.stroke();
@@ -1889,17 +1843,17 @@
       rx.globalAlpha = .16 * d.s; rx.beginPath(); rx.arc(d.sx, d.sy, big * 2.8, 0, 7); rx.fill();
       rx.globalAlpha = (d.sealed ? .45 : .95) * Math.min(1, d.s); rx.beginPath(); rx.arc(d.sx, d.sy, big, 0, 7); rx.fill();
     }
-    // light rising out of the deep, through the rings, gone a little above them
+    // dust rising off the wood
+    rx.fillStyle = "#f6dcb0";
     for (const m of dust) {
-      m.y += m.v * dt * 1.8; if (m.y > .75) { m.y = -2.3; m.a += 2.4; }
+      m.y += m.v * dt; if (m.y > .7) m.y = 0;
       const [x, y, , s] = proj(Math.cos(m.a) * m.r, m.y, Math.sin(m.a) * m.r);
-      rx.globalAlpha = Math.sin((m.y + 2.3) / 3.05 * Math.PI) * .55;
-      rx.fillStyle = m.y < 0 ? "#d9c6ff" : "#f6dcb0";
-      rx.beginPath(); rx.arc(x, y, .9 * s * m.z, 0, 7); rx.fill();
+      rx.globalAlpha = Math.sin(m.y / .7 * Math.PI) * .5;
+      rx.beginPath(); rx.arc(x, y, .9 * s, 0, 7); rx.fill();
     }
     rx.globalAlpha = 1; rx.globalCompositeOperation = "source-over";
 
-    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(233,223,210,.55)";
+    rx.font = `300 11px "Songti SC", "STSong", "Noto Serif SC", serif`; rx.textAlign = "center"; rx.fillStyle = "rgba(233,223,210,.7)";
     ring.months.forEach((m, i) => { if (m && i < shown) { const [x, y] = onRing(Math.PI / 2, R0 + step * (i + 1), i); rx.fillText(m, x, y + 13); } });
     if (shown >= ring.n - .5) {
       const [x, y] = onRing(Math.PI / 2, 1, ring.n - 1);
@@ -1924,16 +1878,16 @@
       try {
         ring = shapeRings(location.search.includes("demo") ? fakeRings() : await (await fetch("api/rings")).json());
       } catch { $("#ringStat").textContent = "年轮没取到，等会儿再看。"; return; }
-      $("#ringStat").innerHTML = `<b>${ring.n}</b> 圈 · <b>${ring.dots.length}</b> 颗星 · 底下 <b>${ring.deep.length}</b> 句没说出口`;
+      $("#ringStat").innerHTML = `<b>${ring.n}</b> 圈 · <b>${ring.dots.length}</b> 颗星 · <b>${ring.edges.length}</b> 根线`;
       $("#ringLegend").innerHTML = RING_LEGEND.map(([k, n]) => `<span><i style="background:${RING_KINDS[k]}"></i>${n}</span>`).join("");
-      ringT0 = location.search.includes("still") ? -1e6 : performance.now();   // ?still skips the growing
+      ringT0 = performance.now();
     }
     if (!ringLoop) { ringLoop = true; ringLast = 0; requestAnimationFrame(ringFrame); }
   }
 
   function pickRing(px, py) {
     let best = null, bd = 18 * 18;
-    for (const d of [...(ring?.dots || []), ...(ring?.deep || [])]) {
+    for (const d of ring?.dots || []) {
       if (d.sx == null) continue;
       const dd = (d.sx - px) ** 2 + (d.sy - py) ** 2;
       if (dd < bd) { bd = dd; best = d; }
@@ -1942,7 +1896,7 @@
     const box = $("#ringPick");
     if (!best) { box.hidden = true; return; }
     const when = `${best.event_date}${/T(\d\d:\d\d)/.test(best.created_at || "") ? " · 写于 " + RegExp.$1 : ""}`;
-    const kin = (ring.dots.includes(best) ? ring.edges : []).filter(([a, b]) => a === best || b === best).length;
+    const kin = ring.edges.filter(([a, b]) => a === best || b === best).length;
     box.innerHTML = `<div class="rk"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${RING_KINDS[best.kind] || "#a9b3c9"}"></i> ${esc(KIND_NAME[best.kind] || best.kind)} · ${esc(when)}${kin ? ` · 牵着 ${kin} 根线` : ""}</div>`
       + `<div class="rt">${esc(best.title || "（没有标题）")}</div>` + (best.body ? `<div class="rb">${esc(best.body)}${best.body.length >= 140 ? "…" : ""}</div>` : "");
     box.hidden = false;
@@ -1989,7 +1943,7 @@
   }, { passive: false });
   $("#ringEnter").addEventListener("click", () => showPage("today"));
   document.querySelectorAll("body > h1 img, body > h1 > span:not(.theme)").forEach((x) => x.addEventListener("click", () => showPage("rings")));
-  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.pitch = .85; ringT0 = performance.now(); });
+  rc.addEventListener("dblclick", () => { ringView.k = 1; ringView.pitch = 1.02; ringT0 = performance.now(); });
 
   // a page can be opened by name from the address (…/#save); otherwise home is the rings
   let startPage = location.hash.slice(1) || "rings";
