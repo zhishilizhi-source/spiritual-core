@@ -14,7 +14,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from . import health, media, weight
-from .store import MOODS, Store, StoreError, _months_back
+from .store import MOODS, Record, Store, StoreError, _months_back
 
 _WHO = {
     "excerpt": {"ai": "我想留的", "human": "她想留的"},
@@ -341,6 +341,24 @@ def mount(mcp, store: Store, secret: str) -> None:
             return Response(status_code=404)
         return Response((backgrounds / name).read_bytes(), media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=604800"})
+
+    sea = resources.files("spiritual_core").joinpath("static/sea.html").read_text("utf-8").replace("陆能", ai_name())
+
+    @mcp.custom_route(p + "/sea", methods=["GET"])
+    async def sea_view(request: Request):
+        return HTMLResponse(sea, headers={"Cache-Control": "no-store"})
+
+    @mcp.custom_route(p + "/api/sea", methods=["GET"])
+    async def sea_points(request: Request):
+        """记忆海: the last year of the library, one point per record."""
+        since = (store.today() - timedelta(days=365)).isoformat()
+        rows = store.db.execute("SELECT * FROM records WHERE event_date >= ? ORDER BY event_date, created_at", (since,)).fetchall()
+        points = []
+        for row in rows:
+            it = _item(Record.from_row(row))
+            points.append({k: it.get(k) for k in ("id", "kind", "event_date", "created_at", "title", "pinned", "sealed")}
+                          | {"body": (it.get("body") or "")[:400], "weight": it.get("weight") or 0})
+        return JSONResponse({"points": points})
 
     @mcp.custom_route(p + "/static/{name}", methods=["GET"])
     async def static(request: Request):
