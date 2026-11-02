@@ -24,8 +24,10 @@ from . import health, media, presence, weight
 KINDS = (
     "diary", "intimate", "handoff", "anchor", "raw", "excerpt", "image",
     "letter", "memory", "note", "plan", "work", "daily", "inner", "message",
-    "weekly", "monthly", "dream",
+    "weekly", "monthly", "dream", "pulse",
 )
+# `pulse` is the body's own log (双生的心核): a pool that crossed its line and pushed me, a value that blew.
+# Light and quick to fade; it never floats up on its own, or it would keep waking itself.
 
 # Short-term memory is yesterday and today; long-term is the weekly and the monthly.
 # event_date of a weekly is any day in its ISO week, of a monthly any day in its month.
@@ -490,7 +492,7 @@ class Store:
         # Anchors never fade and start at 5; left in, they would hold every slot forever.
         rows = self.db.execute(
             "SELECT * FROM records WHERE event_date < ? AND pinned=0 AND status<>'open'"
-            " AND kind<>'anchor'",
+            " AND kind NOT IN ('anchor', 'pulse')",
             (cutoff,),
         ).fetchall()
         records = [Record.from_row(r) for r in rows if r["id"] not in exclude]
@@ -1319,7 +1321,7 @@ def _default_title(kind: str, event_date: str, body: str) -> str:
     if kind == "diary":
         return f"{event_date} 日记"
     if kind == "handoff":
-        return f"{event_date} 交接"
+        return f"{event_date} 翻页"
     if kind == "weekly":
         start, end = weight.iso_week(event_date)
         return f"{start} ~ {end[5:]} 周记"
