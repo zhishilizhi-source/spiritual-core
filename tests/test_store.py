@@ -280,3 +280,12 @@ def test_delete_record_keeps_anchors(store):
     rec = store.write("anchor", "不退")
     with pytest.raises(StoreError):
         store.delete_record(rec.id)
+
+
+def test_search_falls_back_to_pieces(store):
+    a = store.write("diary", "那天她在阳台上说，今晚想吃火锅，还要放很多香菜。", title="阳台")
+    store.write("diary", "完全不相干的一天，修了一下午的水管。", title="水管")
+    assert store.search("她想吃火锅放香菜") and store.search("她想吃火锅放香菜")[0].id == a.id   # 整句不在，拆词能找到
+    assert store.search("阳台上火锅", kinds=["note"]) == []                                       # 过滤照样管用
+    assert store.search("天上掉馅饼") == []                                                       # 只撞上零星一个字不算
+    assert store.search("鱼") == []                                                               # 单字没得拆

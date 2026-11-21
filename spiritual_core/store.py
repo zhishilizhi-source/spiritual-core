@@ -885,6 +885,8 @@ class Store:
         sql = base + "".join(" AND " + w for w in where) + order + " LIMIT ?"
         args.append(limit * 5)
         found = [Record.from_row(r) for r in self.db.execute(sql, args).fetchall()]
+        if not found:   # whole phrase found nothing: break it into words and search again
+            found = self._loose(groups, kinds, start, end, limit)
         # Relevance first, weight second: a heavy memory can climb a few places, not jump the list.
         scores = self.weigh(found)
         ranked = sorted(
@@ -893,6 +895,49 @@ class Store:
             reverse=True,
         )
         return [r for _, r in ranked[:limit]]
+
+    def _loose(self, groups, kinds, start, end, limit) -> list[Record]:
+        """Fallback when the whole phrase matches nothing: cut every word into overlapping two-character
+        pieces, take records that hold any of them, and keep the ones holding the most (rarer pieces count more)."""
+        pieces: list[str] = []
+        for g in groups:
+            for a in g:
+                a = a.strip()
+                for i in range(max(1, len(a) - 1)):
+                    p = a[i:i + 2]
+                    if len(p) == 2 and not p.isspace() and p not in pieces:
+                        pieces.append(p)
+        pieces = pieces[:30]
+        if len(pieces) < 2:   # a one-or-two character query has nothing left to split
+            return []
+        esc = lambda a: "%" + a.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"  # noqa: E731
+        one = ("(r.title LIKE ? ESCAPE '\\' OR r.body LIKE ? ESCAPE '\\'"
+                " OR r.tags LIKE ? ESCAPE '\\' OR r.why LIKE ? ESCAPE '\\')")
+        where, args = ["(" + " OR ".join([one] * len(pieces)) + ")"], []
+        for p in pieces:
+            args += [esc(p)] * 4
+        if kinds:
+            _check_kinds(kinds)
+            where.append(f"r.kind IN ({','.join('?' * len(kinds))})")
+            args += kinds
+        if start:
+            where.append("r.event_date >= ?")
+            args.append(self._check_date(start, "start"))
+        if end:
+            where.append("r.event_date <= ?")
+            args.append(self._check_date(end, "end"))
+        rows = self.db.execute("SELECT r.* FROM records r WHERE " + " AND ".join(where)
+                               + " ORDER BY r.event_date DESC LIMIT 500", args).fetchall()
+        recs = [Record.from_row(r) for r in rows]
+        texts = [" ".join([r.title or "", r.body or "", ",".join(r.tags or []), r.why or ""]) for r in recs]
+        df = {p: sum(p in t for t in texts) or 1 for p in pieces}
+        scored = []
+        for rec, t in zip(recs, texts):
+            hit = [p for p in pieces if p in t]
+            if len(hit) >= max(2, len(pieces) // 3):   # one stray common word is not a match
+                scored.append((sum(1 / df[p] for p in hit), rec))
+        scored.sort(key=lambda x: -x[0])
+        return [r for _, r in scored[:limit * 5]]
 
     # --- messages: he speaks first, she answers when she likes ---
 
