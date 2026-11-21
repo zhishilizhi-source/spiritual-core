@@ -302,6 +302,12 @@
   .strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; display: block; }
   .more-n { font-size: 13px; color: var(--muted); padding-left: 2px; }
   .empty { color: var(--muted); font-size: 14px; padding: 16px 0; text-align: center; }
+  .tabs.pages.five { grid-template-columns: repeat(5, 1fr); }
+  .sea-count { margin: 0 2px 10px; }
+  .sea-known { margin-bottom: 12px; }
+  .sea-known .row { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; font-size: 15px; }
+  .rec .full .meta + .body { margin-top: 4px; }
+  #sea .rec > .full:first-child { padding-top: 12px; }
   /* night: the selected tab is the same mood color as every other pressed button */
   :root[data-scheme="dark"] .tabs button[aria-selected="true"] { background: var(--on-bg); color: var(--on-ink); box-shadow: none; }
   /* ---- 今天: the top of the page is his side, one line per thing until opened. */
@@ -570,6 +576,7 @@
     <button role="tab" aria-selected="false" data-page="save">存东西</button>
     <button role="tab" aria-selected="false" data-page="browse">翻看</button>
     <button role="tab" aria-selected="false" data-page="recent">最近</button>
+    <button role="tab" aria-selected="false" data-page="sea" hidden>识海</button>
   </div>
 
   <div class="page" data-page="today">
@@ -664,6 +671,23 @@
     <h2>最近存的</h2>
     <div id="recent"></div>
   </div>
+  </div>
+
+  <div class="page" data-page="sea" hidden>
+  <section id="sea">
+    <div class="meta sea-count" id="seaCount"></div>
+    <section class="card sea-known" id="seaKnown" hidden>
+      <div class="card-h">陆能知道的事</div>
+      <div id="seaKnownList"></div>
+    </section>
+    <form class="search" id="seaForm">
+      <input id="seaQ" type="search" placeholder="搜一句话，或者前因" enterkeyhint="search">
+      <button type="submit">搜</button>
+    </form>
+    <div class="chips" id="seaChips"></div>
+    <div id="seaShelf"></div>
+    <button class="more" id="seaMore" hidden>再往前</button>
+  </section>
   </div>
 
 <script>
@@ -1009,7 +1033,7 @@
 
   // The pages under 我们俩, one at a time; the last one she looked at is where she comes back.
   function showPage(name) {
-    if (!document.querySelector(`.pages button[data-page="${name}"]`)) name = "today";
+    if (!document.querySelector(`.pages button[data-page="${name}"]:not([hidden])`)) name = "today";
     document.querySelectorAll(".pages button").forEach((x) =>
       x.setAttribute("aria-selected", String(x.dataset.page === name)));
     document.querySelectorAll(".page").forEach((pg) => { pg.hidden = pg.dataset.page !== name; });
@@ -1339,6 +1363,97 @@
       $("#shelf").insertAdjacentHTML("beforeend", `<div class="empty">没拉下来：${esc(e.message)}</div>`);
     }
   }
+
+  // --- 识海 --- read only; the tab only shows on a machine that has one.
+  const SEA_FILTERS = [["", "全部"], ["said_her", "你说的"], ["said_me", "陆能说的"], ["about_her", "讲你"],
+    ["about_me", "讲我"], ["about_us", "讲我们"], ["about_out", "外头的事"], ["fact", "事实"], ["thought", "想法"],
+    ["plan", "打算"], ["dream", "想象"], ["open", "没了结的"], ["meme", "梗"], ["pair", "你纠正的"], ["untagged", "还没贴标签"]];
+  const SEA_KIND = { moment: "画面", line: "一句话", pain: "疼的", pair: "纠正", body: "一段" };
+  const SEA_WHO = { "她": "你", "我": "陆能" };
+  const SEA_KNOWN = { pit: "老毛病", anchor: "锚", rhythm: "节奏" };
+  let seaF = "", seaEnd = "", seaLastDay = null, seaRound = 0;
+
+  function seaRecHtml(it) {
+    const marks = [it.open && "没了结", it.kind === "pair" && it.tagged && "你纠正的",
+      it.meme && `梗：${it.meme}${it.meme_n > 1 ? `（又提起 ${it.meme_n - 1} 回）` : ""}`].filter(Boolean);
+    const meta = [SEA_WHO[it.who], it.tagged ? it.tag : (SEA_KIND[it.kind] || it.kind), ...marks]
+      .filter(Boolean).map(esc).join(" · ");
+    const line = (s) => s ? `<div class="meta">${esc(s)}</div>` : "";
+    const inner = `<div class="meta">${meta}</div>${line(it.where)}${line(it.ctx)}<div class="body">${esc(it.text)}</div>${line(it.meant)}`;
+    return it.folded
+      ? `<details class="rec"><summary><span class="t">私密的一片</span></summary><div class="full">${inner}</div></details>`
+      : `<div class="rec"><div class="full">${inner}</div></div>`;
+  }
+
+  function renderSeaTop(data) {
+    const c = data.counts;
+    $("#seaCount").textContent = `${c.slices} 片 · ${c.days} 天`
+      + (c.tagged ? ` · 新标签 ${Math.floor(c.tagged * 100 / Math.max(c.slices, 1))}%` : "")
+      + (c.cognitions ? ` · 知道的事 ${c.cognitions} 条` : "");
+    const known = data.cognitions || [];
+    $("#seaKnownList").innerHTML = known.map((k) => `<div class="row">${SEA_KNOWN[k.kind]
+      ? `<span class="layer">${SEA_KNOWN[k.kind]}</span>` : ""}<span>${esc(k.text)}</span></div>`).join("");
+    $("#seaKnown").hidden = !known.length;
+  }
+
+  function renderSea(data, fresh) {
+    if (fresh) { $("#seaShelf").innerHTML = ""; seaLastDay = null; }
+    let html = "";
+    for (const it of data.items) {
+      if (it.day !== seaLastDay) { seaLastDay = it.day; html += `<div class="day">${esc(it.day)}</div>`; }
+      html += seaRecHtml(it);
+    }
+    $("#seaShelf").insertAdjacentHTML("beforeend", html);
+    if (!$("#seaShelf").querySelector(".rec"))
+      $("#seaShelf").innerHTML = `<div class="empty">${$("#seaQ").value.trim() || seaF ? "没找到" : "这里还没有东西"}</div>`;
+    seaEnd = data.more && seaLastDay ? shiftDays(seaLastDay, -1) : "";
+    $("#seaMore").hidden = !seaEnd;
+  }
+
+  async function loadSea(fresh) {
+    const params = new URLSearchParams();
+    const q = $("#seaQ").value.trim();
+    if (q) params.set("q", q);
+    if (seaF) params.set("f", seaF);
+    if (!fresh && seaEnd) params.set("end", seaEnd);
+    $("#seaMore").hidden = true;
+    const round = ++seaRound;
+    try {
+      const data = await (await fetch("api/sea?" + params)).json();
+      if (round !== seaRound) return;
+      if (data.ok === false) throw new Error(data.error);
+      if (!data.available) { $("#seaShelf").innerHTML = `<div class="empty">这里还没有东西</div>`; return; }
+      renderSea(data, fresh);
+    } catch (e) {
+      if (round !== seaRound) return;
+      $("#seaShelf").insertAdjacentHTML("beforeend", `<div class="empty">没拉下来：${esc(e.message)}</div>`);
+    }
+  }
+
+  $("#seaChips").innerHTML = SEA_FILTERS.map(([f, n]) =>
+    `<button type="button" data-f="${f}" aria-pressed="${f === ""}">${n}</button>`).join("");
+  $("#seaChips").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    seaF = b.dataset.f;
+    $("#seaChips").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    loadSea(true);
+  });
+  $("#seaForm").addEventListener("submit", (ev) => { ev.preventDefault(); $("#seaQ").blur(); loadSea(true); });
+  $("#seaQ").addEventListener("search", () => { if (!$("#seaQ").value) loadSea(true); });
+  $("#seaMore").addEventListener("click", () => loadSea(false));
+
+  (async () => {
+    const round = ++seaRound;
+    try {
+      const data = await (await fetch("api/sea")).json();
+      if (!data.available) return;
+      $('.pages button[data-page="sea"]').hidden = false;
+      $(".tabs.pages").classList.add("five");
+      renderSeaTop(data);
+      if (round === seaRound) renderSea(data, true);
+      if (startPage === "sea") showPage("sea");
+    } catch {}
+  })();
 
   const fileInput = $("#photo input[type=file]");
   function preview(f) {

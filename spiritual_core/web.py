@@ -7,6 +7,8 @@ from pathlib import Path
 
 import json
 import re
+import sqlite3
+from urllib.parse import quote
 from datetime import date, datetime, time, timedelta
 from importlib import resources
 
@@ -321,6 +323,19 @@ def mount(mcp, store: Store, secret: str) -> None:
             "start": start, "end": end, "earliest": store.earliest_date(),
         })
 
+    @mcp.custom_route(p + "/api/sea", methods=["GET"])
+    async def sea(request: Request):
+        """识海: the slices cut from the library, newest day first, a few days at a time (end).
+        Read only; a machine without one just says so."""
+        q = request.query_params
+        end = q.get("end", "")
+        try:
+            if end:
+                date.fromisoformat(end)
+        except ValueError as e:
+            return _err(str(e))
+        return JSONResponse(sea_view(store, q.get("q", "").strip(), q.get("f", ""), end))
+
     backgrounds = store.path.parent / "backgrounds"
 
     def background_names() -> list[str]:
@@ -395,6 +410,135 @@ def today_view(store: Store) -> dict:
         "month_ago_date": m.isoformat() if m else None,
         "locked": store.locked_count(),
     }
+
+
+SEA_PAGE_DAYS = 7
+SEA_FILTERS = {"her": "who = '她'", "me": "who = '我'", "pain": "kind = 'pain'", "pair": "kind = 'pair'"}
+# 识海换了新标签（soulworld/tags.py）以后按它筛；跟 soulworld/view.py 的 FILTERS 对齐
+SEA_TAG_FILTERS = {
+    "about_her": "about = '她'", "about_me": "about = '我'", "about_us": "about = '我们'", "about_out": "about = '外头'",
+    "said_her": "said = '她'", "said_me": "said = '我'",
+    "fact": "truth = '事实'", "thought": "truth = '想法'", "plan": "truth = '打算'", "dream": "truth = '想象'",
+    "open": "open = 1", "meme": "meme != ''", "pair": "kind = 'pair'", "untagged": "tagged = 0",
+}
+
+
+def sea_path() -> Path:
+    return Path(os.environ.get("SC_SEA_DB") or Path.home() / "SoulWorld" / "soulworld.db")
+
+
+def _sea_open() -> tuple[sqlite3.Connection, set[str]] | None:
+    """Opened read-only, fresh each time; None when there is no 识海 here."""
+    path = sea_path()
+    if not path.is_file():
+        return None
+    try:
+        db = sqlite3.connect("file:///" + quote(path.resolve().as_posix().lstrip("/"), safe="/:") + "?mode=ro",
+                             uri=True)
+    except sqlite3.Error:
+        return None
+    try:
+        tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    except sqlite3.Error:
+        db.close()
+        return None
+    if "slices" not in tables:
+        db.close()
+        return None
+    return db, tables
+
+
+def _sea_sources(store: Store, srcs: list[str]) -> dict[str, str]:
+    """Which source records may be shown, and their kind. Locked or gone ones are left out."""
+    out = {}
+    for i in range(0, len(srcs), 500):
+        part = srcs[i:i + 500]
+        rows = store.db.execute(
+            f"SELECT id, kind FROM records WHERE locked=0 AND id IN ({','.join('?' * len(part))})", part)
+        out.update({r[0]: r[1] for r in rows})
+    return out
+
+
+def sea_view(store: Store, q: str = "", f: str = "", end: str = "") -> dict:
+    opened = _sea_open()
+    if opened is None:
+        return {"available": False}
+    db, tables = opened
+    try:
+        # 跟 soulworld/view.py 一样：只列沉进识海的，冷库里的（淡了的、梗又提起的）不列
+        live = "sunk = 1" + (" AND id NOT IN (SELECT slice_id FROM cold)" if "cold" in tables else "")
+        shown = _sea_sources(store, [r[0] for r in db.execute(f"SELECT DISTINCT src FROM slices WHERE {live}")])
+        slices, days = 0, set()
+        for src, day, n in db.execute(f"SELECT src, day, COUNT(*) FROM slices WHERE {live} GROUP BY src, day"):
+            if src in shown:
+                slices += n
+                days.add(day)
+        has_cog = "cognitions" in tables
+        out = {"available": True, "counts": {
+            "slices": slices, "days": len(days),
+            "cognitions": db.execute("SELECT COUNT(*) FROM cognitions WHERE active=1").fetchone()[0] if has_cog else 0,
+        }}
+        if has_cog and not (q or f or end):
+            out["cognitions"] = [{"text": r[0], "kind": r[1], "day": r[2]} for r in db.execute(
+                "SELECT text, kind, day FROM cognitions WHERE active=1 ORDER BY day DESC, rowid")]
+
+        notes = "notes" in tables
+        tagged = "tags" in tables
+        if tagged:
+            tagged_n = db.execute(f"SELECT COUNT(*) FROM slices WHERE {live} AND id IN (SELECT slice_id FROM tags)"
+                                  ).fetchone()[0]
+            out["counts"]["tagged"] = tagged_n
+            memes = {r[0]: r[1] for r in db.execute(
+                "SELECT meme, COUNT(*) FROM tags WHERE COALESCE(meme, '') != '' GROUP BY meme")}
+        else:
+            memes = {}
+        cols = ("COALESCE(n.who, '') AS who, COALESCE(n.ctx, '') AS ctx" if notes else "'' AS who, '' AS ctx")
+        tcols = ("t.slice_id IS NOT NULL AS tagged, COALESCE(t.about, '') AS about, COALESCE(t.sub, '') AS sub, "
+                 "COALESCE(t.mode, '') AS mode, COALESCE(t.truth, '') AS truth, COALESCE(t.scene, '') AS scene, "
+                 "COALESCE(t.open, 0) AS open, COALESCE(NULLIF(t.said_by, ''), "
+                 + ("n.who" if notes else "''") + ", '') AS said, COALESCE(t.doing, '') AS doing, "
+                 "COALESCE(t.meant, '') AS meant, COALESCE(t.reply, '') AS reply, COALESCE(t.meme, '') AS meme"
+                 if tagged else
+                 "0 AS tagged, '' AS about, '' AS sub, '' AS mode, '' AS truth, '' AS scene, 0 AS open, "
+                 + ("n.who" if notes else "''") + " AS said, '' AS doing, '' AS meant, '' AS reply, '' AS meme")
+        sql = ("SELECT * FROM (SELECT s.id, s.src, s.day, s.kind, s.text, " + cols + ", " + tcols + " FROM slices s"
+               + (" LEFT JOIN notes n ON n.slice_id = s.id" if notes else "")
+               + (" LEFT JOIN tags t ON t.slice_id = s.id" if tagged else "")
+               + " WHERE s.sunk = 1" + (" AND s.id NOT IN (SELECT slice_id FROM cold)" if "cold" in tables else "")
+               + ") WHERE 1")
+        args: list = []
+        if f in SEA_TAG_FILTERS:
+            sql += " AND " + SEA_TAG_FILTERS[f]
+        elif f in SEA_FILTERS:
+            sql += " AND " + SEA_FILTERS[f]
+        if q:
+            sql += (" AND (instr(text, ?) > 0 OR instr(ctx, ?) > 0 OR instr(scene, ?) > 0"
+                    " OR instr(meant, ?) > 0 OR instr(reply, ?) > 0 OR instr(meme, ?) > 0)")
+            args += [q] * 6
+        if end:
+            sql += " AND day <= ?"
+            args.append(end)
+        items, page_days, more = [], set(), False
+        for r in db.execute(sql + " ORDER BY day DESC, src, id", args):
+            if r[1] not in shown:
+                continue
+            if r[2] not in page_days and len(page_days) == SEA_PAGE_DAYS:
+                more = True
+                break
+            page_days.add(r[2])
+            (tg, about, sub, mode, truth, scene, opn, said, doing, meant, reply, meme) = r[7:19]
+            items.append({"id": r[0], "day": r[2], "kind": r[3], "who": said or r[5], "ctx": r[6], "text": r[4],
+                          "folded": shown[r[1]] == "intimate", "tagged": bool(tg),
+                          "tag": "·".join(x for x in (about and ("讲" + about + ("·" + sub if sub else "")), mode, truth) if x),
+                          "where": "，".join(x for x in (scene, doing and "当时在" + doing) if x),
+                          "meant": "；".join(x for x in (meant and "意思：" + meant, reply and "我怎么接的：" + reply) if x),
+                          "open": bool(opn), "meme": meme, "meme_n": memes.get(meme, 0) if meme else 0})
+        out["items"], out["more"] = items, more
+        return out
+    except sqlite3.Error:
+        return {"available": False}
+    finally:
+        db.close()
 
 
 def _item(r, weighed: dict | None = None) -> dict:

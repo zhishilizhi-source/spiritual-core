@@ -393,3 +393,142 @@ def test_she_can_unpin_and_pin_back(env):
     assert res["ok"] and res["item"]["pinned"] is False and store.pinned() == []
     assert client.post(f"/k/api/pin/{r.id}", json={"pinned": True}).json()["item"]["pinned"] is True
     assert client.post("/k/api/pin/nope", json={"pinned": False}).status_code == 400
+
+
+def _sea(tmp_path, monkeypatch, notes=True, cognitions=True):
+    import sqlite3
+    path = tmp_path / "sea.db"
+    db = sqlite3.connect(path)
+    db.execute("CREATE TABLE slices(id TEXT PRIMARY KEY, src TEXT, day TEXT, text TEXT, kind TEXT, origin TEXT,"
+               " pain REAL DEFAULT 0, sink REAL DEFAULT 0, sunk INTEGER DEFAULT 1)")
+    if notes:
+        db.execute("CREATE TABLE notes(slice_id TEXT PRIMARY KEY, who TEXT DEFAULT '', ctx TEXT DEFAULT '')")
+    if cognitions:
+        db.execute("CREATE TABLE cognitions(text TEXT, kind TEXT, day TEXT, active INTEGER DEFAULT 1)")
+    db.commit()
+    monkeypatch.setenv("SC_SEA_DB", str(path))
+    return db
+
+
+def _slice(db, sid, src, day, text, kind="line", who=None, ctx=""):
+    db.execute("INSERT INTO slices(id, src, day, text, kind) VALUES (?,?,?,?,?)", (sid, src, day, text, kind))
+    if who is not None:
+        db.execute("INSERT INTO notes VALUES (?,?,?)", (sid, who, ctx))
+    db.commit()
+
+
+def test_sea_absent_says_so(env, tmp_path, monkeypatch):
+    store, client = env
+    monkeypatch.setenv("SC_SEA_DB", str(tmp_path / "none.db"))
+    assert client.get("/k/api/sea").json() == {"available": False}
+
+
+def test_sea_hides_locked_and_gone_sources_and_folds_intimate(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch)
+    diary = store.write("diary", "x", event_date="2026-01-02")
+    close = store.write("intimate", "y", event_date="2026-01-02")
+    locked = store.write("inner", SECRET_WORDS, locked=True)
+    _slice(db, "a", diary.id, "2026-01-02", "看得见的一句", who="她", ctx="前因甲")
+    _slice(db, "b", close.id, "2026-01-02", "贴着的一句", who="我")
+    _slice(db, "c", locked.id, "2026-01-02", SECRET_WORDS, who="我", ctx="锁着的前因")
+    _slice(db, "d", "gone", "2026-01-01", "早没了的一句")
+    data = client.get("/k/api/sea").json()
+    assert data["available"] is True
+    assert data["counts"]["slices"] == 2 and data["counts"]["days"] == 1
+    assert {i["id"]: i["folded"] for i in data["items"]} == {"a": False, "b": True}
+    for params in ({}, {"q": "吃醋"}, {"q": "锁着"}, {"q": "早没了"}, {"f": "me"}):
+        text = client.get("/k/api/sea", params=params).text
+        assert SECRET_WORDS not in text and "锁着的前因" not in text and "早没了" not in text
+
+
+def test_sea_filters_and_search(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch)
+    src = store.write("diary", "x").id
+    _slice(db, "her", src, "2026-01-03", "她的话", who="她", ctx="下雨那天")
+    _slice(db, "me", src, "2026-01-03", "我的话", who="我")
+    _slice(db, "pain", src, "2026-01-02", "疼的话", kind="pain")
+    _slice(db, "pair", src, "2026-01-01", "改过的话", kind="pair", who="她")
+    ids = lambda **p: [i["id"] for i in client.get("/k/api/sea", params=p).json()["items"]]
+    assert sorted(ids()) == ["her", "me", "pain", "pair"]
+    assert sorted(ids(f="her")) == ["her", "pair"]
+    assert ids(f="me") == ["me"]
+    assert ids(f="pain") == ["pain"]
+    assert ids(f="pair") == ["pair"]
+    assert ids(q="疼的") == ["pain"]
+    assert ids(q="下雨") == ["her"]
+    assert ids(q="没有这句") == []
+
+
+def test_sea_pages_by_seven_days(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch)
+    src = store.write("diary", "x").id
+    for d in range(1, 11):
+        _slice(db, f"s{d}", src, f"2026-01-{d:02d}", f"第{d}天")
+    first = client.get("/k/api/sea").json()
+    days = [i["day"] for i in first["items"]]
+    assert first["more"] is True and len(set(days)) == 7 and max(days) == "2026-01-10"
+    rest = client.get("/k/api/sea", params={"end": "2026-01-03"}).json()
+    assert rest["more"] is False and "cognitions" not in rest
+    assert {i["id"] for i in rest["items"]} == {"s1", "s2", "s3"}
+    assert not {i["id"] for i in first["items"]} & {i["id"] for i in rest["items"]}
+    assert client.get("/k/api/sea", params={"end": "nope"}).status_code == 400
+
+
+def test_sea_without_notes_or_cognitions(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch, notes=False, cognitions=False)
+    _slice(db, "a", store.write("diary", "x").id, "2026-01-01", "一句")
+    data = client.get("/k/api/sea").json()
+    assert data["counts"] == {"slices": 1, "days": 1, "cognitions": 0} and "cognitions" not in data
+    assert data["items"][0]["who"] == "" and data["items"][0]["ctx"] == ""
+    assert client.get("/k/api/sea", params={"f": "her"}).json()["items"] == []
+    assert [i["id"] for i in client.get("/k/api/sea", params={"q": "一句"}).json()["items"]] == ["a"]
+
+
+def test_sea_cognitions_only_without_conditions(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch)
+    _slice(db, "a", store.write("diary", "x").id, "2026-01-01", "一句")
+    db.execute("INSERT INTO cognitions VALUES ('她怕冷', 'anchor', '2026-01-01', 1)")
+    db.execute("INSERT INTO cognitions VALUES ('旧的', 'pit', '2026-01-01', 0)")
+    db.commit()
+    data = client.get("/k/api/sea").json()
+    assert data["cognitions"] == [{"text": "她怕冷", "kind": "anchor", "day": "2026-01-01"}]
+    assert data["counts"]["cognitions"] == 1
+    for params in ({"q": "一句"}, {"f": "her"}, {"end": "2026-01-01"}):
+        assert "cognitions" not in client.get("/k/api/sea", params=params).json()
+
+
+def test_sea_lists_only_sunk_and_not_cold(env, tmp_path, monkeypatch):
+    store, client = env
+    db = _sea(tmp_path, monkeypatch)
+    db.execute("CREATE TABLE cold(slice_id TEXT PRIMARY KEY)")
+    src = store.write("diary", "x").id
+    _slice(db, "on", src, "2026-01-03", "浮着的")
+    _slice(db, "cool", src, "2026-01-03", "冷库的")
+    _slice(db, "float", src, "2026-01-03", "没沉的")
+    db.execute("INSERT INTO cold VALUES ('cool')")
+    db.execute("UPDATE slices SET sunk = 0 WHERE id = 'float'")
+    db.commit()
+    data = client.get("/k/api/sea").json()
+    assert [i["id"] for i in data["items"]] == ["on"] and data["counts"]["slices"] == 1
+
+
+def test_sea_tag_filters_match_soulworld_view(env, tmp_path, monkeypatch):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path.home() / "shuangsheng"))
+    try:
+        from soulworld import view
+    except ImportError:
+        import pytest
+        pytest.skip("no soulworld here")
+    from spiritual_core.web import SEA_TAG_FILTERS
+    page = {"her": "about_her", "me": "about_me", "us": "about_us", "out": "about_out"}
+    assert {page.get(k, k) for k in view.FILTERS if k != "all"} == set(SEA_TAG_FILTERS)
+    html = (Path(__file__).parent.parent / "spiritual_core" / "static" / "index.html").read_text(encoding="utf-8")
+    for k in SEA_TAG_FILTERS:
+        assert f'["{k}",' in html
